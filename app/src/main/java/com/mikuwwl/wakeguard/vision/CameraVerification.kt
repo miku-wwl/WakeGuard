@@ -31,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -41,6 +42,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -88,12 +90,13 @@ fun CameraVerificationScreen(
         hasPermission = it
     }
     var frame by remember { mutableStateOf<VisionFrame?>(null) }
+    var frameSequence by remember { mutableLongStateOf(0L) }
     var failure by remember { mutableStateOf<String?>(null) }
     var passed by remember { mutableStateOf(false) }
     var failedAttemptsShown by remember { mutableStateOf(0) }
     val evaluator = remember(thresholds) { VerificationEvaluator(thresholds) }
 
-    LaunchedEffect(frame) {
+    LaunchedEffect(frameSequence) {
         val latest = frame ?: return@LaunchedEffect
         if (evaluator.accept(latest).passed && !passed) {
             passed = true
@@ -106,7 +109,7 @@ fun CameraVerificationScreen(
             Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            OutlinedButton(onClick = onBackToAlarm) {
+            OutlinedButton(onClick = onBackToAlarm, colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)) {
                 androidx.compose.material3.Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                 Text(" 返回闹钟")
             }
@@ -125,7 +128,7 @@ fun CameraVerificationScreen(
                     Spacer(Modifier.height(8.dp))
                     OutlinedButton(onClick = {
                         context.startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:${context.packageName}")))
-                    }) { Text("打开应用设置") }
+                    }, colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)) { Text("打开应用设置") }
                 }
             }
         } else {
@@ -134,7 +137,7 @@ fun CameraVerificationScreen(
                 context = context,
                 lifecycleOwner = lifecycleOwner,
                 previewView = previewView,
-                onFrame = { frame = it; failure = null },
+                onFrame = { frame = it; frameSequence += 1L; failure = null },
                 onFailure = { failure = it },
                 engineFactory = engineFactory,
                 modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp).testTag("camera_preview"),
@@ -152,7 +155,10 @@ fun CameraVerificationScreen(
                     VisionRow("牙膏", frame?.toothpaste, thresholds.toothpaste, "vision_toothpaste")
                     failure?.let { Text("识别暂不可用：$it", color = Color(0xFFFFB4AB)) }
                     Text("连续三帧达到门槛后才会通过。图像仅在设备内存中处理。", color = Color(0xFFB7C9C8), style = MaterialTheme.typography.bodySmall)
-                    OutlinedButton(onClick = { evaluator.reset(); failedAttemptsShown += 1; onRecordFailedAttempt() }) {
+                    OutlinedButton(
+                        onClick = { evaluator.reset(); failedAttemptsShown += 1; onRecordFailedAttempt() },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                    ) {
                         Text("记录本次未通过并重新扫描")
                     }
                     if (failedAttemptsShown > 0) Text("已记录未通过 $failedAttemptsShown 次", color = Color(0xFFB7C9C8), style = MaterialTheme.typography.bodySmall)
@@ -161,7 +167,7 @@ fun CameraVerificationScreen(
         }
 
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.Center) {
-            OutlinedButton(onClick = onEmergencyStop) { Text("紧急停止") }
+            OutlinedButton(onClick = onEmergencyStop, colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)) { Text("紧急停止") }
         }
         Spacer(Modifier.height(12.dp))
     }

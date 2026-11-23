@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -487,7 +488,11 @@ private fun AlarmRingingScreen(onStartVerification: () -> Unit, onEmergencyStop:
             Text("起床时间到了", color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
             Text("走到洗手台，让身体开始新的一天。", color = Color(0xFFC2D3D0), style = MaterialTheme.typography.bodyLarge)
             Button(onClick = onStartVerification, modifier = Modifier.fillMaxWidth().height(56.dp).testTag("start_verification")) { Text("开始现场验证") }
-            OutlinedButton(onClick = onEmergencyStop, modifier = Modifier.fillMaxWidth()) { Text("紧急停止（记录为未完成）") }
+            OutlinedButton(
+                onClick = onEmergencyStop,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+            ) { Text("紧急停止（记录为未完成）") }
             Text("返回键不会关闭闹钟。按 Home 后，声音与通知会继续。", color = Color(0xFF93AAA5), style = MaterialTheme.typography.bodySmall)
         }
     }
