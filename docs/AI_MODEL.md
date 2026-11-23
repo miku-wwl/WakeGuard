@@ -20,3 +20,5 @@ The MIMEX card reports 10,357 training images and 4,920 test images across 28 pr
 ## License notes
 
 The MIMEX Hugging Face dataset card declares MIT. The EfficientDet-Lite0 model card distributed by LiteRT Community identifies the Google MediaPipe `/1/` artifact as Apache-2.0 and documents its upstream URL; the downloaded file's SHA-256 is recorded in `THIRD_PARTY_NOTICES.md`. These are source-provided license statements; the project does not redistribute the raw training data.
+
+The positive instrumentation photo is a compressed, resized rendition from Miriam Alonso's Pexels photo. Pexels permits free use and modification, with restrictions against redistribution on stock-photo and wallpaper platforms; source, license link, and bundled-file SHA-256 are recorded in `app/src/androidTest/assets/vision/SOURCES.txt`. It is test-only and is not packaged into the production app.

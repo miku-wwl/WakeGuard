@@ -6,7 +6,10 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -96,6 +99,27 @@ class VisionEngineInstrumentedTest {
         }
         composeRule.waitUntil(30_000) { verified.get() }
         assertTrue("The same passing scene must be accepted over three analyzed frames", analyzedFrames.get() >= 3)
+    }
+
+    @Test fun cameraPermissionDenialKeepsEmergencyExitAvailable() {
+        val appContext = ApplicationProvider.getApplicationContext<Context>()
+        InstrumentationRegistry.getInstrumentation().uiAutomation
+            .revokeRuntimePermission(appContext.packageName, Manifest.permission.CAMERA)
+        val emergencyRequested = AtomicBoolean(false)
+        composeRule.setContent {
+            MaterialTheme {
+                CameraVerificationScreen(
+                    thresholds = VisionThresholds(),
+                    onVerified = {},
+                    onRecordFailedAttempt = {},
+                    onEmergencyStop = { emergencyRequested.set(true) },
+                    onBackToAlarm = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("需要相机权限进行现场识别").assertIsDisplayed()
+        composeRule.onNodeWithText("紧急停止").assertIsDisplayed().performClick()
+        assertTrue("The explicit emergency path remains available without camera permission", emergencyRequested.get())
     }
 
     private fun loadFixture(context: Context, path: String): Bitmap =

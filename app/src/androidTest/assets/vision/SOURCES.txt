@@ -14,5 +14,6 @@ pexels-toothbrush-toothpaste-at-sink.jpeg
 Source: https://www.pexels.com/photo/person-holding-toothbrush-and-toothpaste-7622566/
 Photographer: Miriam Alonso; photo date: 2021-04-23. Pexels License: https://www.pexels.com/license/ (free use and modification; attribution is optional; do not redistribute on stock-photo or wallpaper platforms).
 Content: close-up hand squeezing toothpaste onto a toothbrush at a sink; downloaded as a compressed 500 x 750 JPEG rendition for instrumentation testing.
+Bundled rendition SHA-256: C62D71EBBEA0C2D9217ABD4C407E4DCAD367EDE22CB87144A8D46BA1FB30E18D.
 
 The toothpaste product photo and sink-only scene cover separate model signals and incomplete combinations. The Pexels photo is the positive all-three scene fixture; its small set size supports smoke testing only, not a general accuracy claim.
