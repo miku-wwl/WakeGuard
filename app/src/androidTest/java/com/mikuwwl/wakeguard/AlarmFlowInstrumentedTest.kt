@@ -1,6 +1,7 @@
 package com.mikuwwl.wakeguard
 
 import android.Manifest
+import java.io.FileInputStream
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -90,6 +91,24 @@ class AlarmFlowInstrumentedTest {
         composeRule.onNodeWithTag("camera_preview").assertIsDisplayed()
     }
 
+    @Test fun activeAlarmRouteReturnsAfterHomeBackground() = runBlocking {
+        val eventId = database.wakeEventDao().insert(
+            WakeEventEntity(alarmId = 104, triggeredAt = System.currentTimeMillis(), outcome = WakeOutcome.RINGING),
+        )
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("开始现场验证").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        runShell("input keyevent 3")
+        runShell("am start -W -n com.mikuwwl.wakeguard/.presentation.MainActivity")
+
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("开始现场验证").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("start_verification").assertIsDisplayed()
+        assertEquals(WakeOutcome.RINGING, database.wakeEventDao().getById(eventId)?.outcome)
+    }
+
     @Test fun verificationAndEmergencyOutcomesAreIdempotent() = runBlocking {
         val dao = database.wakeEventDao()
         val verifiedId = dao.insert(WakeEventEntity(alarmId = 101, triggeredAt = 1_000, outcome = WakeOutcome.RINGING))
@@ -102,5 +121,14 @@ class AlarmFlowInstrumentedTest {
         assertEquals(1, dao.finishEmergency(emergencyId, 6_000))
         assertEquals(0, dao.finishVerified(emergencyId, 7_000))
         assertEquals(WakeOutcome.EMERGENCY_STOP, dao.getById(emergencyId)?.outcome)
+    }
+
+    private fun runShell(command: String): String {
+        val descriptor = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)
+        return try {
+            FileInputStream(descriptor.fileDescriptor).use { String(it.readBytes()) }
+        } finally {
+            descriptor.close()
+        }
     }
 }
