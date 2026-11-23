@@ -5,9 +5,9 @@ Run checks on the local Android Emulator only; no physical-device testing is per
 ## Automated checks
 
 - `testDebugUnitTest`: one-time/repeating schedule boundaries, weekday rollover, timezone-local time, threshold boundaries, consecutive-frame reset, missing-object failure, and non-finite scores.
-- `connectedDebugAndroidTest`: app startup, create/persist an alarm in Room, and idempotent verified/emergency event transitions.
+- `connectedDebugAndroidTest`: app startup, create/edit/delete and persist alarms in Room, idempotent verified/emergency event transitions, live camera preview and model score rows, plus a dependency-injected camera check that three identical valid frames complete verification.
 - `lintDebug` and `assembleDebug`: Android static analysis and installable debug APK.
-- Vision model evaluation: actual ONNX classifier inference over the pinned MIMEX official test split. Report includes the held-out threshold-selection split and confusion counts.
+- Vision model evaluation: actual ONNX classifier inference over the pinned MIMEX official test split, one licensed all-three bathroom scene, and two incomplete fixtures. Report includes the held-out threshold-selection split, product-image confusion counts, and per-scene scores; the single scene image is a smoke test, not a broad accuracy estimate.
 
 ## Emulator scenarios
 

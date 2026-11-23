@@ -34,19 +34,22 @@ class VisionEngineInstrumentedTest {
         val testContext = InstrumentationRegistry.getInstrumentation().context
         val product = loadFixture(testContext, "vision/macau-toothbrush-toothpaste.jpg")
         val incompleteScene = loadFixture(testContext, "vision/washingtoothbrush.jpg")
+        val completeScene = loadFixture(testContext, "vision/pexels-toothbrush-toothpaste-at-sink.jpeg")
         val engine = OnDeviceVisionEngine(context)
         try {
             val productFrame = engine.analyze(product)
             val incompleteFrame = engine.analyze(incompleteScene)
+            val completeFrame = engine.analyze(completeScene)
             Log.i(
                 TAG,
-                "product_frame=$productFrame incomplete_sink_scene=$incompleteFrame",
+                "product_frame=$productFrame incomplete_sink_scene=$incompleteFrame complete_scene=$completeFrame",
             )
 
             assertTrue(
                 "All detector and classifier scores must be finite",
                 listOf(productFrame.sink, productFrame.toothbrush, productFrame.toothpaste,
-                    incompleteFrame.sink, incompleteFrame.toothbrush, incompleteFrame.toothpaste)
+                    incompleteFrame.sink, incompleteFrame.toothbrush, incompleteFrame.toothpaste,
+                    completeFrame.sink, completeFrame.toothbrush, completeFrame.toothpaste)
                     .all(Float::isFinite),
             )
             assertTrue(
@@ -62,10 +65,14 @@ class VisionEngineInstrumentedTest {
             repeat(3) {
                 assertFalse("A sink and toothbrush without toothpaste must not verify", sinkOnlyEvaluator.accept(incompleteFrame).passed)
             }
+            val positiveEvaluator = VerificationEvaluator(VisionThresholds())
+            val positiveProgress = (1..3).map { positiveEvaluator.accept(completeFrame) }
+            Log.i(TAG, "complete_scene_verification=${positiveProgress.last()} after=${positiveProgress.map { it.consecutiveValidFrames }}")
         } finally {
             engine.close()
             product.recycle()
             incompleteScene.recycle()
+            completeScene.recycle()
         }
     }
 

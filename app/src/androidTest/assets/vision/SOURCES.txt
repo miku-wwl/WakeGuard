@@ -10,4 +10,9 @@ Source: https://commons.wikimedia.org/wiki/File:Washingtoothbrush.jpg
 Photographer: Zhan Wang (Flickr); date: 2015-09-20. Wikimedia Commons review confirms the uploader's Public Domain Mark declaration.
 Content: running sink and toothbrush; no visible toothpaste.
 
-These two photos cover separate model signals and a realistic incomplete scene. They do not provide a positive natural image with all three required objects together; that acceptance criterion remains partial until such a fixture is available.
+pexels-toothbrush-toothpaste-at-sink.jpeg
+Source: https://www.pexels.com/photo/person-holding-toothbrush-and-toothpaste-7622566/
+Photographer: Miriam Alonso; photo date: 2021-04-23. Pexels License: https://www.pexels.com/license/ (free use and modification; attribution is optional; do not redistribute on stock-photo or wallpaper platforms).
+Content: close-up hand squeezing toothpaste onto a toothbrush at a sink; downloaded as a compressed 500 x 750 JPEG rendition for instrumentation testing.
+
+The toothpaste product photo and sink-only scene cover separate model signals and incomplete combinations. The Pexels photo is the positive all-three scene fixture; its small set size supports smoke testing only, not a general accuracy claim.

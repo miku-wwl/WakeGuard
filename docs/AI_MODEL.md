@@ -15,7 +15,7 @@ The MIMEX card reports 10,357 training images and 4,920 test images across 28 pr
 
 ## Evaluation scope
 
-`D:\workshop\nov\reports\ai-classifier-metrics.json` and the matching CSV record actual counts, validation threshold, and test confusion metrics once training finishes. These metrics are for product imagery in the MIMEX split. They are not bathroom-scene metrics and do not prove real-world recall or false-positive rates when toothpaste is small or partly occluded. COCO detection of sink/toothbrush and a natural-scene three-object set are reported separately. If natural-scene evidence is unavailable or weak, verification remains an alpha feature and the release gate must reflect that.
+`D:\workshop\nov\reports\ai-classifier-metrics.json` and the matching CSV record actual counts, validation threshold, and held-out MIMEX product-image test confusion metrics. Those metrics do not prove bathroom-scene recall or false-positive rates. Android instrumentation also runs the bundled local models on one licensed positive bathroom photo containing a sink, toothbrush, and toothpaste, plus two incomplete scenes; it logs each actual score and tests the three-frame evaluator. The positive scene is a smoke-test sample, not a representative scene benchmark. The app remains an alpha feature until more varied bathroom imagery establishes reliable real-world behavior.
 
 ## License notes
 
