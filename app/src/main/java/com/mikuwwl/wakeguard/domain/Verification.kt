@@ -3,7 +3,7 @@ package com.mikuwwl.wakeguard.domain
 data class VisionThresholds(
     val sink: Float = 0.45f,
     val toothbrush: Float = 0.45f,
-    val toothpaste: Float = 0.80f,
+    val toothpaste: Float = 0.93f,
 ) {
     fun sanitized(): VisionThresholds = copy(
         sink = sink.coerceIn(0.2f, 0.95f),

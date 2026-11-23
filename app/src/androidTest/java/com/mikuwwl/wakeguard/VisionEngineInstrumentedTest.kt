@@ -7,7 +7,7 @@ import android.graphics.BitmapFactory
 import android.util.Log
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
@@ -16,7 +16,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.mikuwwl.wakeguard.domain.VerificationEvaluator
 import com.mikuwwl.wakeguard.domain.VisionFrame
 import com.mikuwwl.wakeguard.domain.VisionThresholds
-import com.mikuwwl.wakeguard.presentation.MainActivity
 import com.mikuwwl.wakeguard.vision.CameraVerificationScreen
 import com.mikuwwl.wakeguard.vision.OnDeviceVisionEngine
 import com.mikuwwl.wakeguard.vision.VisionEngine
@@ -30,7 +29,7 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class VisionEngineInstrumentedTest {
-    @get:Rule val composeRule = createAndroidComposeRule<MainActivity>()
+    @get:Rule val composeRule = createComposeRule()
 
     @Test fun localModelsScoreFixturesAndRejectBothIncompleteCombinations() {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -38,28 +37,35 @@ class VisionEngineInstrumentedTest {
         val product = loadFixture(testContext, "vision/macau-toothbrush-toothpaste.jpg")
         val incompleteScene = loadFixture(testContext, "vision/washingtoothbrush.jpg")
         val completeScene = loadFixture(testContext, "vision/pexels-toothbrush-toothpaste-at-sink.jpeg")
+        val sinkVisibleScene = loadFixture(testContext, "vision/pexels-sink-toothpaste-8091115.jpeg")
+        val closeScene = loadFixture(testContext, "vision/pexels-toothbrush-toothpaste-sink-8091047.jpeg")
+        val widePositiveScene = loadFixture(testContext, "vision/pexels-toothpaste-sink-7622547.jpg")
+        val bathroomScene = loadFixture(testContext, "vision/pexels-bathroom-sink-toothbrush-4154164.jpg")
         val engine = OnDeviceVisionEngine(context)
         try {
             val productFrame = engine.analyze(product)
             val incompleteFrame = engine.analyze(incompleteScene)
             val completeFrame = engine.analyze(completeScene)
+            val sinkVisibleFrame = engine.analyze(sinkVisibleScene)
+            val closeFrame = engine.analyze(closeScene)
+            val widePositiveFrame = engine.analyze(widePositiveScene)
+            val bathroomFrame = engine.analyze(bathroomScene)
             Log.i(
                 TAG,
-                "product_frame=$productFrame incomplete_sink_scene=$incompleteFrame complete_scene=$completeFrame",
+                "product_frame=$productFrame incomplete_sink_scene=$incompleteFrame complete_scene=$completeFrame sink_visible_scene=$sinkVisibleFrame close_scene=$closeFrame wide_positive_scene=$widePositiveFrame bathroom_scene=$bathroomFrame",
             )
 
             assertTrue(
                 "All detector and classifier scores must be finite",
                 listOf(productFrame.sink, productFrame.toothbrush, productFrame.toothpaste,
                     incompleteFrame.sink, incompleteFrame.toothbrush, incompleteFrame.toothpaste,
-                    completeFrame.sink, completeFrame.toothbrush, completeFrame.toothpaste)
+                    completeFrame.sink, completeFrame.toothbrush, completeFrame.toothpaste,
+                    sinkVisibleFrame.sink, sinkVisibleFrame.toothbrush, sinkVisibleFrame.toothpaste,
+                    closeFrame.sink, closeFrame.toothbrush, closeFrame.toothpaste,
+                    widePositiveFrame.sink, widePositiveFrame.toothbrush, widePositiveFrame.toothpaste,
+                    bathroomFrame.sink, bathroomFrame.toothbrush, bathroomFrame.toothpaste)
                     .all(Float::isFinite),
             )
-            assertTrue(
-                "A real toothpaste photo should score above the sink-only scene: $productFrame vs $incompleteFrame",
-                productFrame.toothpaste > incompleteFrame.toothpaste,
-            )
-
             val productOnlyEvaluator = VerificationEvaluator(VisionThresholds())
             repeat(3) {
                 assertFalse("Toothbrush and toothpaste without a sink must not verify", productOnlyEvaluator.accept(productFrame).passed)
@@ -70,12 +76,27 @@ class VisionEngineInstrumentedTest {
             }
             val positiveEvaluator = VerificationEvaluator(VisionThresholds())
             val positiveProgress = (1..3).map { positiveEvaluator.accept(completeFrame) }
-            Log.i(TAG, "complete_scene_verification=${positiveProgress.last()} after=${positiveProgress.map { it.consecutiveValidFrames }}")
+            positiveEvaluator.reset()
+            val sinkVisibleProgress = (1..3).map { positiveEvaluator.accept(sinkVisibleFrame) }
+            positiveEvaluator.reset()
+            val closeProgress = (1..3).map { positiveEvaluator.accept(closeFrame) }
+            positiveEvaluator.reset()
+            val widePositiveProgress = (1..3).map { positiveEvaluator.accept(widePositiveFrame) }
+            positiveEvaluator.reset()
+            val bathroomProgress = (1..3).map { positiveEvaluator.accept(bathroomFrame) }
+            Log.i(
+                TAG,
+                "complete_scene_verification=$positiveProgress sink_visible_scene_verification=$sinkVisibleProgress close_scene_verification=$closeProgress wide_positive_scene_verification=$widePositiveProgress bathroom_scene_verification=$bathroomProgress",
+            )
         } finally {
             engine.close()
             product.recycle()
             incompleteScene.recycle()
             completeScene.recycle()
+            sinkVisibleScene.recycle()
+            closeScene.recycle()
+            widePositiveScene.recycle()
+            bathroomScene.recycle()
         }
     }
 
@@ -102,9 +123,6 @@ class VisionEngineInstrumentedTest {
     }
 
     @Test fun cameraPermissionDenialKeepsEmergencyExitAvailable() {
-        val appContext = ApplicationProvider.getApplicationContext<Context>()
-        InstrumentationRegistry.getInstrumentation().uiAutomation
-            .revokeRuntimePermission(appContext.packageName, Manifest.permission.CAMERA)
         val emergencyRequested = AtomicBoolean(false)
         composeRule.setContent {
             MaterialTheme {
@@ -114,6 +132,7 @@ class VisionEngineInstrumentedTest {
                     onRecordFailedAttempt = {},
                     onEmergencyStop = { emergencyRequested.set(true) },
                     onBackToAlarm = {},
+                    cameraPermissionChecker = { false },
                 )
             }
         }

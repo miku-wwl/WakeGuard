@@ -18,3 +18,4 @@ License: MIT (see MIT-ONNX-Runtime.txt)
 
 WakeGuard toothpaste classifier
 A MobileNetV3-Small classifier trained locally from random initialization on Anilot/MIMEX revision fa7017f07b10efdb4dc461c14b8da1ae8aa01e73. Dataset card license tag: MIT. Raw dataset images are not included in the app.
+ONNX asset SHA-256: 612059EB8395EF670ACE3A0571F150D58F4BA9345E1D24C5557DD6E1917A004F. The classifier maps only the Sensodyne and Colgate MIMEX toothpaste labels to its toothpaste score.

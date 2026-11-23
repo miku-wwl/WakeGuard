@@ -41,25 +41,29 @@ class OnDeviceVisionEngine(context: Context) : VisionEngine {
     }
 
     override fun analyze(bitmap: Bitmap): VisionFrame {
-        val detections = detector.detect(BitmapImageBuilder(bitmap).build()).detections()
+        val crops = candidateCrops(bitmap)
         var sink = 0f
         var toothbrush = 0f
-        for (detection in detections) {
-            for (category in detection.categories()) {
-                when (category.categoryName().trim().lowercase()) {
-                    "sink" -> sink = maxOf(sink, category.score())
-                    "toothbrush" -> toothbrush = maxOf(toothbrush, category.score())
+        try {
+            // Keep full-scene context, then scan the centered zoom where small items such as a toothbrush
+            // are easier to recognize. Scores are still tied to objects in this same live camera frame.
+            listOf(bitmap, crops.first()).forEach { input ->
+                val detections = detector.detect(BitmapImageBuilder(input).build()).detections()
+                for (detection in detections) {
+                    for (category in detection.categories()) {
+                        when (category.categoryName().trim().lowercase()) {
+                            "sink" -> sink = maxOf(sink, category.score())
+                            "toothbrush" -> toothbrush = maxOf(toothbrush, category.score())
+                        }
+                    }
                 }
             }
-        }
-        val crops = candidateCrops(bitmap)
-        var toothpaste = 0f
-        try {
+            var toothpaste = 0f
             crops.forEach { crop -> toothpaste = maxOf(toothpaste, classifyToothpaste(crop)) }
+            return VisionFrame(sink = sink, toothbrush = toothbrush, toothpaste = toothpaste)
         } finally {
             crops.forEach { crop -> if (crop !== bitmap && !crop.isRecycled) crop.recycle() }
         }
-        return VisionFrame(sink = sink, toothbrush = toothbrush, toothpaste = toothpaste)
     }
 
     private fun candidateCrops(bitmap: Bitmap): List<Bitmap> {

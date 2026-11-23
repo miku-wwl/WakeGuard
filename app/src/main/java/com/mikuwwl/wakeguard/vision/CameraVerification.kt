@@ -71,16 +71,19 @@ fun CameraVerificationScreen(
     onEmergencyStop: () -> Unit,
     onBackToAlarm: () -> Unit,
     engineFactory: (Context) -> VisionEngine = { OnDeviceVisionEngine(it) },
+    cameraPermissionChecker: (Context) -> Boolean = {
+        ContextCompat.checkSelfPermission(it, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+    },
 ) {
     val context = LocalContext.current
     var hasPermission by remember {
-        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
+        mutableStateOf(cameraPermissionChecker(context))
     }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                hasPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                hasPermission = cameraPermissionChecker(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)

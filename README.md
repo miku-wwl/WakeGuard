@@ -1,8 +1,8 @@
 # WakeGuard
 
-WakeGuard is an offline-first Android alarm prototype. It schedules exact alarm-clock events, keeps ringing through normal app backgrounding, and offers a live CameraX task that checks for a sink, toothbrush, and toothpaste before recording a successful wake-up.
+WakeGuard is an offline-first Android alarm prototype. It schedules exact alarm-clock events, keeps ringing through normal app backgrounding, and offers a live CameraX task intended to check for a sink, toothbrush, and toothpaste before recording a successful wake-up.
 
-The app is an alpha. Sink and toothbrush are recognized by Google's COCO-trained EfficientDet-Lite0 model. Toothpaste is classified by a small MobileNetV3-Small model trained locally from scratch on two toothpaste categories in the MIT-tagged MIMEX product dataset. The dataset contains product imagery rather than bathroom scenes, so the current evaluation does not prove reliable recognition in every real bathroom layout. See [AI model notes](docs/AI_MODEL.md) for measured results and limits.
+The app is an alpha. Sink and toothbrush are recognized by Google's COCO-trained EfficientDet-Lite0 model. Toothpaste is classified by a small MobileNetV3-Small model trained locally from scratch on two toothpaste categories in the MIT-tagged MIMEX product dataset. Product-image metrics do not establish real bathroom-scene performance: **none of the four licensed complete bathroom scenes tested passed all three production thresholds**, so end-to-end camera verification remains unvalidated and the prerelease gate is closed. See [AI model notes](docs/AI_MODEL.md) for measured scores and limits.
 
 ## Features
 
@@ -27,9 +27,18 @@ The verified Windows setup for this workspace is documented in [docs/SETUP.md](d
 
 The debug APK is created at `app/build/outputs/apk/debug/app-debug.apk`. Exact-alarm, notification, full-screen-intent, and camera access must be granted by the user in Android settings or in the app's permission flow.
 
-## Screenshots and reports
+## Emulator screenshots
 
-Execution evidence is kept outside Git under `D:\workshop\nov\reports`. The final acceptance report records the actual emulator runs, test outcomes, model evaluation, CI, and release state.
+These screenshots were captured on the API 36 Android Emulator. The camera image is the emulator's synthetic virtual-camera feed; it scored sink 0%, toothbrush 0%, toothpaste 91% against thresholds 45%, 45%, and 93%, so it did not verify a wake-up.
+
+| App state | Screenshot |
+| --- | --- |
+| Alarm list | ![WakeGuard alarm list](docs/screenshots/home.png) |
+| Active alarm | ![WakeGuard active alarm](docs/screenshots/alarm.png) |
+| Live camera and model scores | ![WakeGuard camera preview](docs/screenshots/camera.png) |
+| Wake history after emergency stop and system interruption | ![WakeGuard statistics](docs/screenshots/stats.png) |
+
+Execution logs and the final acceptance report are kept outside Git under `D:\workshop\nov\reports`.
 
 ## Platform limits
 

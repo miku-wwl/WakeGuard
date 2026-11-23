@@ -23,3 +23,4 @@
 - Dataset: `Anilot/MIMEX`, revision `fa7017f07b10efdb4dc461c14b8da1ae8aa01e73`.
 - Dataset card license tag: MIT. The custom classifier was trained locally from random initialization; no pretrained weights are bundled.
 - The raw dataset and extracted product images are not redistributed in this repository.
+- Project-generated ONNX classifier: `app/src/main/assets/toothpaste_classifier.onnx`, SHA-256 `612059EB8395EF670ACE3A0571F150D58F4BA9345E1D24C5557DD6E1917A004F` (6,195,838 bytes). It recognizes only the two labels `sensodyne_toothpaste` and `colgate_toothpaste` as toothpaste.

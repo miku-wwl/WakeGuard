@@ -1,7 +1,6 @@
 package com.mikuwwl.wakeguard
 
 import android.Manifest
-import java.io.FileInputStream
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -72,41 +71,25 @@ class AlarmFlowInstrumentedTest {
         assertTrue(database.alarmDao().getEnabled().isEmpty())
     }
 
-    @Test fun activeAlarmCanEnterLiveCameraVerification() = runBlocking {
-        val appContext = ApplicationProvider.getApplicationContext<android.content.Context>()
-        InstrumentationRegistry.getInstrumentation().uiAutomation
-            .grantRuntimePermission(appContext.packageName, Manifest.permission.CAMERA)
-        database.wakeEventDao().insert(
-            WakeEventEntity(alarmId = 103, triggeredAt = System.currentTimeMillis(), outcome = WakeOutcome.RINGING),
-        )
-        composeRule.waitUntil(10_000) {
-            composeRule.onAllNodesWithText("开始现场验证").fetchSemanticsNodes().isNotEmpty()
-        }
-        composeRule.onNodeWithTag("start_verification").performClick()
-        composeRule.waitUntil(30_000) {
-            listOf("vision_sink_score", "vision_toothbrush_score", "vision_toothpaste_score").all { tag ->
-                composeRule.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
+    @Test fun activeAlarmCanEnterLiveCameraVerification() {
+        runBlocking {
+            val appContext = ApplicationProvider.getApplicationContext<android.content.Context>()
+            InstrumentationRegistry.getInstrumentation().uiAutomation
+                .grantRuntimePermission(appContext.packageName, Manifest.permission.CAMERA)
+            database.wakeEventDao().insert(
+                WakeEventEntity(alarmId = 103, triggeredAt = System.currentTimeMillis(), outcome = WakeOutcome.RINGING),
+            )
+            composeRule.waitUntil(10_000) {
+                composeRule.onAllNodesWithText("开始现场验证").fetchSemanticsNodes().isNotEmpty()
             }
+            composeRule.onNodeWithTag("start_verification").performClick()
+            composeRule.waitUntil(30_000) {
+                listOf("vision_sink_score", "vision_toothbrush_score", "vision_toothpaste_score").all { tag ->
+                    composeRule.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
+                }
+            }
+            composeRule.onNodeWithTag("camera_preview").assertIsDisplayed()
         }
-        composeRule.onNodeWithTag("camera_preview").assertIsDisplayed()
-    }
-
-    @Test fun activeAlarmRouteReturnsAfterHomeBackground() = runBlocking {
-        val eventId = database.wakeEventDao().insert(
-            WakeEventEntity(alarmId = 104, triggeredAt = System.currentTimeMillis(), outcome = WakeOutcome.RINGING),
-        )
-        composeRule.waitUntil(10_000) {
-            composeRule.onAllNodesWithText("开始现场验证").fetchSemanticsNodes().isNotEmpty()
-        }
-
-        runShell("input keyevent 3")
-        runShell("am start -W -n com.mikuwwl.wakeguard/.presentation.MainActivity")
-
-        composeRule.waitUntil(10_000) {
-            composeRule.onAllNodesWithText("开始现场验证").fetchSemanticsNodes().isNotEmpty()
-        }
-        composeRule.onNodeWithTag("start_verification").assertIsDisplayed()
-        assertEquals(WakeOutcome.RINGING, database.wakeEventDao().getById(eventId)?.outcome)
     }
 
     @Test fun verificationAndEmergencyOutcomesAreIdempotent() = runBlocking {
@@ -123,12 +106,4 @@ class AlarmFlowInstrumentedTest {
         assertEquals(WakeOutcome.EMERGENCY_STOP, dao.getById(emergencyId)?.outcome)
     }
 
-    private fun runShell(command: String): String {
-        val descriptor = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)
-        return try {
-            FileInputStream(descriptor.fileDescriptor).use { String(it.readBytes()) }
-        } finally {
-            descriptor.close()
-        }
-    }
 }

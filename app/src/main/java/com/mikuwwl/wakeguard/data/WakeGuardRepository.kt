@@ -62,7 +62,7 @@ class WakeGuardRepository(context: Context) {
         return VisionThresholds(
             sink = prefs.getFloat("threshold_sink", 0.45f),
             toothbrush = prefs.getFloat("threshold_toothbrush", 0.45f),
-            toothpaste = prefs.getFloat("threshold_toothpaste", 0.80f),
+            toothpaste = prefs.getFloat("threshold_toothpaste", 0.93f),
         ).sanitized()
     }
 

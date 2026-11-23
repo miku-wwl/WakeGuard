@@ -17,3 +17,27 @@ Content: close-up hand squeezing toothpaste onto a toothbrush at a sink; downloa
 Bundled rendition SHA-256: C62D71EBBEA0C2D9217ABD4C407E4DCAD367EDE22CB87144A8D46BA1FB30E18D.
 
 The toothpaste product photo and sink-only scene cover separate model signals and incomplete combinations. The Pexels photo is the positive all-three scene fixture; its small set size supports smoke testing only, not a general accuracy claim.
+
+pexels-sink-toothpaste-8091115.jpeg
+Source: https://www.pexels.com/photo/person-holding-blue-and-white-toothbrush-8091115/
+Photographer: PNW Production; source image dimensions: 4024 x 6048. Pexels License: https://www.pexels.com/license/ (free use and modification; attribution is optional; do not redistribute on stock-photo or wallpaper platforms).
+Content: person preparing a toothbrush with toothpaste at a bathroom sink; resized to 500 x 750 JPEG for instrumentation testing.
+Bundled rendition SHA-256: CE8505EDAD61E3A8C15BE4B1B7835B94ED0CC5974D42397576A83E1C4938E7C6.
+
+pexels-toothbrush-toothpaste-sink-8091047.jpeg
+Source: https://www.pexels.com/photo/selective-focus-photo-of-a-person-applying-toothpaste-on-a-toothbrush-8091047/
+Photographer: PNW Production; source image dimensions: 4024 x 6048. Pexels License: https://www.pexels.com/license/ (free use and modification; attribution is optional; do not redistribute on stock-photo or wallpaper platforms).
+Content: person applying toothpaste to a toothbrush over a bathroom sink; resized to 500 x 750 JPEG for instrumentation testing.
+Bundled rendition SHA-256: CB95D4904C24FAD1080AA366C001425E78F3320E527B3A595C06E75D1D5692CC.
+
+pexels-toothpaste-sink-7622547.jpg
+Source: https://www.pexels.com/photo/close-up-of-person-brushing-teeth-with-toothpaste-7622547/
+Photographer: Miriam Alonso; photo date: 2021-04-23. Pexels License: https://www.pexels.com/license/ (free use and modification; attribution is optional; do not redistribute on stock-photo or wallpaper platforms).
+Content: person applying toothpaste to a toothbrush above a bathroom sink; resized proportionally to 500 pixels wide for instrumentation testing.
+Bundled rendition SHA-256: 09B213384F53A92121B6AB7B7BF371577385467ED7C6A9FC6E31252B624E31ED.
+
+pexels-bathroom-sink-toothbrush-4154164.jpg
+Source: https://www.pexels.com/photo/woman-in-black-long-sleeve-shirt-holding-smartphone-4154164/
+Photographer: cottonbro studio; photo date: 2020-04-14. Pexels License: https://www.pexels.com/license/ (free use and modification; attribution is optional; do not redistribute on stock-photo or wallpaper platforms).
+Content: person preparing a toothbrush at a bathroom sink; resized proportionally to 500 pixels wide for instrumentation testing. The frame is not assumed to contain visible toothpaste.
+Bundled rendition SHA-256: A562B8104CBF3B2ED7E5D31C3AF27C5BE8EFC8AA8B94BD9F3817A6E06A8498BA.
