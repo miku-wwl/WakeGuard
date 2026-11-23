@@ -6,12 +6,12 @@ The verified local installation used for this project is under `D:\workshop\nov`
 - Android SDK API 36, Build Tools 36.0.0, Platform Tools 37.0.3, Emulator 37.3.10.
 - Pixel 7 profile AVD `WakeGuard_API36`, Google APIs x86_64, Android 16, 4 GB guest RAM.
 - Gradle Wrapper 9.9.2 with the official distribution SHA-256 pinned in `gradle/wrapper/gradle-wrapper.properties`.
-- `ANDROID_HOME`, `ANDROID_AVD_HOME`, `ANDROID_USER_HOME`, `GRADLE_USER_HOME`, Java, and temporary paths are set for the current PowerShell process by `D:\workshop\nov\set-wakeguard-env.ps1`. Global Windows environment values are not changed.
+- `ANDROID_HOME`, `ANDROID_AVD_HOME`, `ANDROID_USER_HOME`, `GRADLE_USER_HOME`, Java, and temporary paths are set for the current PowerShell process by `scripts\set-local-environment.ps1`. Global Windows environment values are not changed.
 
 ## Build
 
 ```powershell
-. 'D:\workshop\nov\set-wakeguard-env.ps1'
+. '.\scripts\set-local-environment.ps1'
 .\gradlew.bat --version
 .\gradlew.bat assembleDebug
 .\gradlew.bat testDebugUnitTest

@@ -5,7 +5,7 @@ The workflow in `.github/workflows/android.yml` runs unit tests, Android lint, a
 For local testing:
 
 ```powershell
-. 'D:\workshop\nov\set-wakeguard-env.ps1'
+. '.\scripts\set-local-environment.ps1'
 .\gradlew.bat testDebugUnitTest lintDebug assembleDebug
 .\gradlew.bat connectedDebugAndroidTest
 Get-FileHash app\build\outputs\apk\debug\app-debug.apk -Algorithm SHA256

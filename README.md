@@ -19,7 +19,7 @@ The app is an alpha. Sink and toothbrush are recognized by Google's COCO-trained
 The verified Windows setup for this workspace is documented in [docs/SETUP.md](docs/SETUP.md). With Android SDK API 36 and Java 17 or newer configured:
 
 ```powershell
-. 'D:\workshop\nov\set-wakeguard-env.ps1'
+. '.\scripts\set-local-environment.ps1'
 .\gradlew.bat assembleDebug
 .\gradlew.bat testDebugUnitTest
 .\gradlew.bat connectedDebugAndroidTest

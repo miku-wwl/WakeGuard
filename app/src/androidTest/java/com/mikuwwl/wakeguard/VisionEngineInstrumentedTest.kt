@@ -18,7 +18,7 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class VisionEngineInstrumentedTest {
-    @Test fun localModelsSeparateToothpastePhotoFromIncompleteSinkScene() {
+    @Test fun localModelsScoreFixturesAndRejectBothIncompleteCombinations() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val testContext = InstrumentationRegistry.getInstrumentation().context
         val product = loadFixture(testContext, "vision/macau-toothbrush-toothpaste.jpg")
@@ -32,14 +32,25 @@ class VisionEngineInstrumentedTest {
                 "product_frame=$productFrame incomplete_sink_scene=$incompleteFrame",
             )
 
-            assertTrue("Scores must be finite", productFrame.toothpaste.isFinite() && incompleteFrame.toothpaste.isFinite())
+            assertTrue(
+                "All detector and classifier scores must be finite",
+                listOf(productFrame.sink, productFrame.toothbrush, productFrame.toothpaste,
+                    incompleteFrame.sink, incompleteFrame.toothbrush, incompleteFrame.toothpaste)
+                    .all(Float::isFinite),
+            )
             assertTrue(
                 "A real toothpaste photo should score above the sink-only scene: $productFrame vs $incompleteFrame",
                 productFrame.toothpaste > incompleteFrame.toothpaste,
             )
 
-            val evaluator = VerificationEvaluator(VisionThresholds())
-            repeat(3) { assertFalse("Missing one of the required objects must never verify", evaluator.accept(incompleteFrame).passed) }
+            val productOnlyEvaluator = VerificationEvaluator(VisionThresholds())
+            repeat(3) {
+                assertFalse("Toothbrush and toothpaste without a sink must not verify", productOnlyEvaluator.accept(productFrame).passed)
+            }
+            val sinkOnlyEvaluator = VerificationEvaluator(VisionThresholds())
+            repeat(3) {
+                assertFalse("A sink and toothbrush without toothpaste must not verify", sinkOnlyEvaluator.accept(incompleteFrame).passed)
+            }
         } finally {
             engine.close()
             product.recycle()

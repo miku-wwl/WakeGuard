@@ -74,7 +74,12 @@ class OnDeviceVisionEngine(context: Context) : VisionEngine {
             Rect(0, height - cropHeight, cropWidth, height),
             Rect(width - cropWidth, height - cropHeight, width, height),
         )
-        return positions.map { rect -> Bitmap.createBitmap(bitmap, rect.left, rect.top, rect.width(), rect.height()) }
+        return positions.map { rect ->
+            val side = minOf(rect.width(), rect.height())
+            val left = rect.left + (rect.width() - side) / 2
+            val top = rect.top + (rect.height() - side) / 2
+            Bitmap.createBitmap(bitmap, left, top, side, side)
+        }
     }
 
     private fun classifyToothpaste(bitmap: Bitmap): Float {
