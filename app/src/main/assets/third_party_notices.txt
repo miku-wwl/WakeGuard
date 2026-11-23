@@ -1,0 +1,20 @@
+WakeGuard third-party model and runtime notices
+
+EfficientDet-Lite0 float32
+Source: https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float32/1/efficientdet_lite0.tflite
+Model card: https://huggingface.co/litert-community/MediaPipe-ObjectDetector-EfficientDet-Lite0
+License: Apache License 2.0 (see Apache-2.0.txt)
+SHA-256: recorded in the project THIRD_PARTY_NOTICES.md and acceptance report.
+Trained on COCO. Its labels include sink and toothbrush; toothpaste is not a COCO class.
+Citation: Mingxing Tan, Ruoming Pang, and Quoc V. Le. EfficientDet: Scalable and Efficient Object Detection. CVPR 2020.
+
+MediaPipe Tasks Vision 0.10.29
+Source: https://github.com/google-ai-edge/mediapipe
+License: Apache License 2.0 (see Apache-2.0.txt)
+
+ONNX Runtime Android 1.25.0
+Source: https://github.com/microsoft/onnxruntime
+License: MIT (see MIT-ONNX-Runtime.txt)
+
+WakeGuard toothpaste classifier
+A MobileNetV3-Small classifier trained locally from random initialization on Anilot/MIMEX revision fa7017f07b10efdb4dc461c14b8da1ae8aa01e73. Dataset card license tag: MIT. Raw dataset images are not included in the app.

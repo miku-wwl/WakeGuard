@@ -1,0 +1,13 @@
+Vision instrumentation fixture provenance
+
+macau-toothbrush-toothpaste.jpg
+Source: https://commons.wikimedia.org/wiki/File:MC_%E6%BE%B3%E9%96%80_Macau_%E6%BE%B3%E9%96%80%E5%8D%8A%E5%B3%B6_Macao_Peninsula_%E5%BE%97%E5%8B%9D%E9%A6%AC%E8%B7%AF_2_Estrada_da_Vit%C3%B3ria_%E7%9A%87%E9%83%BD%E9%85%92%E5%BA%97_Royal_Macau_Hotel_hotel_%E6%B5%B4%E5%AE%A4_bathroom_November_2024_R12S_toothbrush_n_toothpaste.jpg
+Photographer: JohnLEE Brothers; date: 2024-11-11. License: CC0 1.0.
+Content: hotel dental kit with packaged toothbrush and toothpaste; no sink in frame.
+
+washingtoothbrush.jpg
+Source: https://commons.wikimedia.org/wiki/File:Washingtoothbrush.jpg
+Photographer: Zhan Wang (Flickr); date: 2015-09-20. Wikimedia Commons review confirms the uploader's Public Domain Mark declaration.
+Content: running sink and toothbrush; no visible toothpaste.
+
+These two photos cover separate model signals and a realistic incomplete scene. They do not provide a positive natural image with all three required objects together; that acceptance criterion remains partial until such a fixture is available.
