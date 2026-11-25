@@ -26,9 +26,9 @@ Statuses reflect observed evidence. AVD behavior is not physical iQOO acceptance
 | R4-20 | PASS | AVD and instrumentation emergency stop produced `EMERGENCY_STOP`, not VERIFIED; service/resource cleanup was observed. |
 | R4-21 | PASS | Existing production vision gate and fixtures/policy were unchanged; metrics remained 4/6, 1/2 independent, 0/5 obvious unrelated. |
 | R4-22 | PASS | 19/19 JVM and 25/25 API 36 instrumentation tests passed. |
-| R4-23 | FAIL | Run 45562303138: `verify` passed; the emulator task-removal step failed because the first active swipe left the task present; the fail-closed `real-vision-gate` job failed. The lightweight model step and artifact upload passed. A corrected harness run is pending. |
+| R4-23 | FAIL | Run 45574688456 on `0339369`: `verify` and API 36 functional instrumentation passed; the strict emulator step failed because the first active swipe left task ID 36 present while the same event, foreground service and MediaPlayer stayed active. TC01 also delivered while its task remained. The model gate and artifact upload passed; `real-vision-gate` failed closed on the emulator result. |
 | R4-24 | PASS | Local ARM64-v8a and x86_64 alpha.4 candidates built, v2 signatures and matching alpha.3 debug certificate verified, hashes recorded. |
-| R4-25 | PENDING | Final evidence and matrix will be committed after the strict harness and CI result are recorded. |
+| R4-25 | PASS | Strict-harness correction, CI result, report and updated matrix are recorded in the pushed Round 4 acceptance commits. Raw CI artifact was downloaded to the local reports directory. |
 | R4-26 | BLOCKED | Alpha.4 publication gate requires physical `PASS_NATIVE` or `PASS_WITH_OEM_CONFIGURATION`; no release will be published now. |
 
 ## Release gate

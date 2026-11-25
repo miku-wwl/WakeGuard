@@ -83,7 +83,7 @@ The app retains the explicit confirmation-gated emergency stop. Local AVD and in
 
 ## 14. GitHub CI
 
-Latest completed run for implementation SHA `8d5d92d101d0a9c8ed35c579d90a1b28473b0080`: `verify` passed; the API 36 emulator task-removal check failed because the first active swipe left the task present; the fail-closed `real-vision-gate` job failed because the emulator job failed. The unchanged lightweight model step and evidence upload passed. A CI run for the strict harness correction is pending push. CI does not include or substitute for physical iQOO acceptance. Detailed evidence is in `D:\workshop\nov\reports\round4\09_CI_ACCEPTANCE.md`.
+Run [45574688456](https://github.com/miku-wwl/WakeGuard/actions/runs/45574688456) tested strict-harness commit `03393692ecafe3f35c37c5d15113028dafab53ef`. `verify` passed; API 36 functional instrumentation passed; the strict emulator task-removal regression failed because the first active swipe left task ID 36 present. The same event remained `RINGING`, with its foreground service and MediaPlayer active. TC01's one-time alarm also delivered while its task remained present. The unchanged lightweight production-model gate passed; `real-vision-gate` failed closed because the emulator job failed. Artifact upload passed. CI does not include or substitute for physical iQOO acceptance. Full evidence and artifact path are in `D:\workshop\nov\reports\round4\09_CI_ACCEPTANCE.md`.
 
 ## 15. Acceptance matrix
 
@@ -99,7 +99,7 @@ Physical acceptance and OriginOS settings remain unavailable. `START_STICKY` is 
 
 ## 18. Final commit and release status
 
-Product implementation commit: `8d5d92d101d0a9c8ed35c579d90a1b28473b0080`. Strict harness and acceptance documentation commit: **to be recorded after push**. Alpha.4 is not published. Alpha.3 remains the historical emulator-validated prerelease. No release tag or GitHub release for alpha.4 will be created until physical acceptance reaches `PASS_NATIVE` or `PASS_WITH_OEM_CONFIGURATION` and all other mandatory gates pass.
+Product implementation commit: `8d5d92d101d0a9c8ed35c579d90a1b28473b0080`. Strict harness and evidence correction commit: `03393692ecafe3f35c37c5d15113028dafab53ef`. The final CI report and acceptance matrix are included in this repository revision. Alpha.4 is not published. Alpha.3 remains the historical emulator-validated prerelease. No release tag or GitHub release for alpha.4 will be created until physical acceptance reaches `PASS_NATIVE` or `PASS_WITH_OEM_CONFIGURATION` and all other mandatory gates pass.
 
 ## 19. Final verdict
 
