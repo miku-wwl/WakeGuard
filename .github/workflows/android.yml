@@ -69,19 +69,32 @@ jobs:
           sdk="$ANDROID_HOME/cmdline-tools/latest/bin"
           yes | "$sdk/sdkmanager" --licenses
           "$sdk/sdkmanager" "platform-tools" "platforms;android-36" "build-tools;36.0.0" "emulator" "system-images;android-36;google_apis;x86_64"
-          printf 'no\n' | "$sdk/avdmanager" create avd -n WakeGuard_API36_CI -k 'system-images;android-36;google_apis;x86_64' --device pixel_7
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/wakeguard-avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
+          "$sdk/avdmanager" create avd -n WakeGuard_API36_CI \
+            -k 'system-images;android-36;google_apis;x86_64' --device pixel_7 \
+            -p "$ANDROID_AVD_HOME/WakeGuard_API36_CI.avd" </dev/null 2>&1 | tee ci-evidence/avd-create.txt
+          "$ANDROID_HOME/emulator/emulator" -list-avds | tee ci-evidence/avds.txt
+          test -s "$ANDROID_AVD_HOME/WakeGuard_API36_CI.avd/config.ini"
+          grep -Fxq WakeGuard_API36_CI ci-evidence/avds.txt
       - name: Boot emulator
         id: boot
         run: |
           "$ANDROID_HOME/emulator/emulator" -accel-check | tee ci-evidence/acceleration.txt
-          "$ANDROID_HOME/emulator/emulator" -avd WakeGuard_API36_CI -no-window -no-snapshot -no-boot-anim             -gpu swiftshader -feature -Vulkan -camera-back emulated -camera-front none             >ci-evidence/emulator.log 2>&1 &
+          "$ANDROID_HOME/emulator/emulator" -avd WakeGuard_API36_CI -no-window -no-snapshot -no-boot-anim \
+            -gpu swiftshader -feature -Vulkan -camera-back emulated -camera-front none \
+            >ci-evidence/emulator.log 2>&1 &
+          emulator_pid=$!
           adb_bin="$ANDROID_HOME/platform-tools/adb"
-          timeout 220 "$adb_bin" wait-for-device
-          for i in {1..100}; do
-            if [[ "$("$adb_bin" shell getprop sys.boot_completed | tr -d '\r')" == '1' ]]; then break; fi
+          boot_deadline=$((SECONDS + 300))
+          until [[ "$(timeout 5 "$adb_bin" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == '1' ]]; do
+            if ! kill -0 "$emulator_pid" 2>/dev/null || (( SECONDS >= boot_deadline )); then
+              tail -n 120 ci-evidence/emulator.log
+              exit 1
+            fi
             sleep 2
           done
-          test "$("$adb_bin" shell getprop sys.boot_completed | tr -d '\r')" = 1
           "$adb_bin" devices -l | tee ci-evidence/devices.txt
           "$adb_bin" shell input keyevent 224
           "$adb_bin" shell wm dismiss-keyguard
@@ -92,7 +105,8 @@ jobs:
         id: functional
         run: |
           chmod +x gradlew
-          ./gradlew connectedDebugAndroidTest --no-daemon             -Pandroid.testInstrumentationRunnerArguments.notAnnotation=androidx.test.filters.LargeTest
+          ./gradlew connectedDebugAndroidTest --no-daemon \
+            -Pandroid.testInstrumentationRunnerArguments.notAnnotation=androidx.test.filters.LargeTest
       - name: Save functional evidence
         if: always() && steps.boot.outcome == 'success'
         run: |
@@ -107,7 +121,8 @@ jobs:
         id: real_model
         continue-on-error: true
         run: |
-          ./gradlew connectedDebugAndroidTest --no-daemon             -Pandroid.testInstrumentationRunnerArguments.class=com.mikuwwl.wakeguard.RealVisionAcceptanceTest
+          ./gradlew connectedDebugAndroidTest --no-daemon \
+            -Pandroid.testInstrumentationRunnerArguments.class=com.mikuwwl.wakeguard.RealVisionAcceptanceTest
       - name: Save real inference evidence
         if: always() && steps.boot.outcome == 'success'
         run: |
