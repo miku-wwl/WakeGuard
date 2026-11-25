@@ -4,7 +4,7 @@ Date: 2026-11-25 (Pacific/Auckland)
 
 ## 1. Executive summary
 
-**Verdict: BLOCKED — PHYSICAL ACCEPTANCE UNAVAILABLE.** Round 4 implements Android-compliant service and state-reconciliation changes, bounded local lifecycle diagnostics, and an explicit user-resume path. JVM, lint, build, API 36 instrumentation, the production-model fixture gate, and a dedicated API 36 Recents-removal harness passed. The owner-reported iQOO Neo9 Pro failure could not be reproduced or cleared because the phone was not connected. Alpha.4 is therefore a local experimental candidate only; alpha.3 remains the last published prerelease.
+**Verdict: BLOCKED — PHYSICAL ACCEPTANCE UNAVAILABLE.** Round 4 implements Android-compliant service and state-reconciliation changes, bounded local lifecycle diagnostics, and an explicit user-resume path. JVM, lint, build, API 36 functional instrumentation, and the production-model fixture gate passed. Strict API 36 Recents-removal checks did not remove the task in either the future-alarm or active-playback case; earlier AVD task-removal PASS claims are withdrawn. The owner-reported iQOO Neo9 Pro failure could not be reproduced or cleared because the phone was not connected. Alpha.4 is therefore a local experimental candidate only; alpha.3 remains the last published prerelease.
 
 ## 2. Owner-reported physical defect
 
@@ -34,8 +34,9 @@ The only attached test target was the existing API 36 x86_64 `WakeGuard_API36` A
 
 - Playback resources are event-scoped and owned by `AlarmForegroundService`, not the Activity.
 - The prior manifest relied on the Android default for `stopWithTask`; omission alone did not establish the physical failure cause.
-- A standard API 36 AVD delivered a scheduled alarm after its task was removed.
-- Three active-service Recents removals preserved the same event and foreground service on that AVD; emergency stop ended that event without counting verification.
+- In strict TC01 and TC02 reruns, the Recents task remained after the attempted swipe. TC01 later delivered its alarm while the task was still present.
+- In TC02, playback, the same `RINGING` event and foreground service remained active while the task stayed present. This does not establish behavior after task removal; TC03 repeated removal was not run.
+- A separate idle-state smoke swipe removed a task from Recents, but this does not reproduce task removal with an alarm scheduled or active.
 - Ordinary sticky recovery and same-event state checks passed in the scheduled AVD flow before its live camera scene failed to qualify.
 - The default AVD camera scene did not qualify within the scheduled flow's 35-second window. The harness emergency-stopped the event; this is a scenario limitation, not a model-gate pass.
 
@@ -57,7 +58,7 @@ No OEM switch was changed or required by emulator acceptance. On the iQOO, first
 
 ## 10. Before/after device behavior
 
-There is no physical before/after comparison. On the standard AVD, the pre-delivery task-removal scenario delivered the scheduled event afterward; during active playback, three Recents swipes retained the same `RINGING` event and service. This demonstrates standard AVD behavior only and does not close the reported iQOO defect.
+There is no physical before/after comparison. In the strict AVD TC01 and TC02 checks, the task remained listed after the attempted swipe. TC01's alarm later delivered while that task remained; TC02's same `RINGING` event, service and MediaPlayer remained active while the task stayed present. Neither case demonstrates recovery after task removal and neither closes the reported iQOO defect.
 
 ## 11. Automated regression
 
@@ -66,7 +67,7 @@ There is no physical before/after comparison. On the standard AVD, the pre-deliv
 - Android lint: **0 errors, 32 warnings, 4 hints**.
 - Debug and instrumentation APK builds: passed.
 - Production model gate: **4/6** labeled positives, **1/2** independent positives, **0/5** obvious unrelated scenes accepted; the existing gate and policy remained unchanged.
-- Dedicated task-removal harness: **PASS** for future delivery after task removal and three active ringing swipes, with same event/service; emergency stop recorded `EMERGENCY_STOP`, service absent, verified count unchanged.
+- Dedicated task-removal harness: **PARTIAL / NOT PASSED**. Strict task-ID checks showed the task remained after the attempted swipe in TC01 and TC02. TC01 later delivered while the task remained; TC02 playback and the same event continued while the task remained. Both events were emergency-stopped with `verified_count=0`; TC03 was not run. Earlier PASS claims based on Recents label disappearance are withdrawn.
 - Scheduled full CameraX flow with task removal and ordinary process recovery: **PARTIAL**. Earlier lifecycle steps passed, but the AVD's selected live scene did not qualify within 35 seconds; emergency cleanup passed.
 - A Round 4 camera-screen-off rerun did not observe `Asleep` after its AVD key events. Round 3 has separate prior AVD screen-off evidence; neither result establishes physical screen-off behavior.
 
@@ -82,7 +83,7 @@ The app retains the explicit confirmation-gated emergency stop. Local AVD and in
 
 ## 14. GitHub CI
 
-CI result for the Round 4 implementation commit: **to be recorded after the push**. CI must pass `verify`, `emulator`, and the unchanged `real-vision-gate`; it does not include or substitute for physical iQOO acceptance. Detailed local evidence will be retained in `D:\workshop\nov\reports\round4\09_CI_ACCEPTANCE.md`.
+Latest completed run for implementation SHA `8d5d92d101d0a9c8ed35c579d90a1b28473b0080`: `verify` passed; the API 36 emulator task-removal check failed because the first active swipe left the task present; the fail-closed `real-vision-gate` job failed because the emulator job failed. The unchanged lightweight model step and evidence upload passed. A CI run for the strict harness correction is pending push. CI does not include or substitute for physical iQOO acceptance. Detailed evidence is in `D:\workshop\nov\reports\round4\09_CI_ACCEPTANCE.md`.
 
 ## 15. Acceptance matrix
 
@@ -98,7 +99,7 @@ Physical acceptance and OriginOS settings remain unavailable. `START_STICKY` is 
 
 ## 18. Final commit and release status
 
-Implementation commit and final documentation commit: **to be recorded after push**. Alpha.4 is not published. Alpha.3 remains the historical emulator-validated prerelease. No release tag or GitHub release for alpha.4 is authorized until physical acceptance reaches `PASS_NATIVE` or `PASS_WITH_OEM_CONFIGURATION` and all other mandatory gates pass.
+Product implementation commit: `8d5d92d101d0a9c8ed35c579d90a1b28473b0080`. Strict harness and acceptance documentation commit: **to be recorded after push**. Alpha.4 is not published. Alpha.3 remains the historical emulator-validated prerelease. No release tag or GitHub release for alpha.4 will be created until physical acceptance reaches `PASS_NATIVE` or `PASS_WITH_OEM_CONFIGURATION` and all other mandatory gates pass.
 
 ## 19. Final verdict
 

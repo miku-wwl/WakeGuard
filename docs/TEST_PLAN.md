@@ -32,7 +32,7 @@ The real vision test is separate from injected-engine UI tests: its fixture scor
 
 ## Round 4 task-removal and physical gate
 
-The emulator-only task-removal harness is `tools/round4/emulator_task_removal_e2e.py`. It requires an explicit API 36 AVD serial, verifies future alarm delivery after task removal, repeats active task removal three times, and emergency-stops the active test event. Do not use the destructive emulator harness on a physical device.
+The emulator-only task-removal harness is `tools/round4/emulator_task_removal_e2e.py`. It requires an explicit API 36 AVD serial, verifies Recents remains open and the exact ActivityManager task ID disappears, checks future alarm delivery after the attempted removal, and exercises up to three active removals (stopping after the first failed swipe). It emergency-stops test events. Do not use the destructive emulator harness on a physical device. Round 4's latest strict AVD attempts did not remove the task; see the [Round 4 acceptance report](acceptance/ROUND4_FINAL_ACCEPTANCE_REPORT.md).
 
 Physical iQOO acceptance is a separate owner-authorized gate. The scoped diagnostic collector is `tools/round4/collect_iqoo_diagnostics.ps1`; supply the explicit authorized serial and retain raw data locally. First record default OEM settings, then run the cases in `docs/acceptance/ROUND4_TEST_MATRIX.md`. Alpha.4 remains unpublished unless the iQOO result is `PASS_NATIVE` or `PASS_WITH_OEM_CONFIGURATION` and all other release gates pass.
 
