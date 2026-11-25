@@ -13,30 +13,135 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 18
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up Java 17
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
           java-version: '17'
-
-      - name: Install Android SDK packages
+      - name: Install Android SDK
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"
-
-      - name: Run unit tests, lint, and debug build
+      - name: Run JVM tests, lint and APK builds
         run: |
           chmod +x gradlew
-          ./gradlew testDebugUnitTest :app:compileDebugAndroidTestKotlin lintDebug assembleDebug --no-daemon
-
-      - name: Upload debug APK
+          ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest --no-daemon
+      - name: Generate and verify APK checksums
+        run: |
+          cd app/build/outputs/apk/debug
+          sha256sum app-{x86_64,arm64-v8a}-debug.apk | tee SHA256SUMS
+          sha256sum --check SHA256SUMS
+          for apk in app-{x86_64,arm64-v8a}-debug.apk; do
+            "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$apk"
+          done
+      - name: Upload build evidence
+        if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: wakeguard-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
+          name: wakeguard-experimental-build-and-checks
+          path: |
+            app/build/outputs/apk/debug/app-*-debug.apk
+            app/build/outputs/apk/debug/SHA256SUMS
+            app/build/test-results/testDebugUnitTest/*.xml
+            app/build/reports/lint-results-debug.*
           retention-days: 14
+
+  emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      model_gate: ${{ steps.real_model.outcome }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install the official API 36 Google APIs image
+        run: |
+          mkdir -p ci-evidence
+          # KVM access is scoped to this disposable GitHub-hosted runner.
+          test -c /dev/kvm
+          sudo chgrp "$(id -gn)" /dev/kvm
+          sudo chmod g+rw /dev/kvm
+          sdk="$ANDROID_HOME/cmdline-tools/latest/bin"
+          yes | "$sdk/sdkmanager" --licenses
+          "$sdk/sdkmanager" "platform-tools" "platforms;android-36" "build-tools;36.0.0" "emulator" "system-images;android-36;google_apis;x86_64"
+          printf 'no\n' | "$sdk/avdmanager" create avd -n WakeGuard_API36_CI -k 'system-images;android-36;google_apis;x86_64' --device pixel_7
+      - name: Boot emulator
+        id: boot
+        run: |
+          "$ANDROID_HOME/emulator/emulator" -accel-check | tee ci-evidence/acceleration.txt
+          "$ANDROID_HOME/emulator/emulator" -avd WakeGuard_API36_CI -no-window -no-snapshot -no-boot-anim             -gpu swiftshader -feature -Vulkan -camera-back emulated -camera-front none             >ci-evidence/emulator.log 2>&1 &
+          adb_bin="$ANDROID_HOME/platform-tools/adb"
+          timeout 220 "$adb_bin" wait-for-device
+          for i in {1..100}; do
+            if [[ "$("$adb_bin" shell getprop sys.boot_completed | tr -d '\r')" == '1' ]]; then break; fi
+            sleep 2
+          done
+          test "$("$adb_bin" shell getprop sys.boot_completed | tr -d '\r')" = 1
+          "$adb_bin" devices -l | tee ci-evidence/devices.txt
+          "$adb_bin" shell input keyevent 224
+          "$adb_bin" shell wm dismiss-keyguard
+          "$adb_bin" shell settings put global window_animation_scale 0
+          "$adb_bin" shell settings put global transition_animation_scale 0
+          "$adb_bin" shell settings put global animator_duration_scale 0
+      - name: Run Android functional regression on API 36
+        id: functional
+        run: |
+          chmod +x gradlew
+          ./gradlew connectedDebugAndroidTest --no-daemon             -Pandroid.testInstrumentationRunnerArguments.notAnnotation=androidx.test.filters.LargeTest
+      - name: Save functional evidence
+        if: always() && steps.boot.outcome == 'success'
+        run: |
+          if [[ -d app/build/outputs/androidTest-results/connected/debug ]]; then
+            cp -r app/build/outputs/androidTest-results/connected/debug ci-evidence/functional
+          fi
+          if [[ "${{ steps.functional.outcome }}" != 'success' ]]; then
+            adb exec-out screencap -p > ci-evidence/functional-post-run.png || true
+          fi
+      - name: Assert complete and incomplete fixtures with production models
+        if: always() && steps.boot.outcome == 'success'
+        id: real_model
+        continue-on-error: true
+        run: |
+          ./gradlew connectedDebugAndroidTest --no-daemon             -Pandroid.testInstrumentationRunnerArguments.class=com.mikuwwl.wakeguard.RealVisionAcceptanceTest
+      - name: Save real inference evidence
+        if: always() && steps.boot.outcome == 'success'
+        run: |
+          if [[ -d app/build/outputs/androidTest-results/connected/debug ]]; then
+            cp -r app/build/outputs/androidTest-results/connected/debug ci-evidence/real-model
+          fi
+          adb logcat -d -s WakeGuardFixture:I WakeGuardAlarm:I WakeGuardRestore:I AndroidRuntime:E > ci-evidence/model-and-alarm-logcat.txt
+          python tools/round2/collect_fixture_scores.py ci-evidence ci-evidence/model-evaluation.json
+          if [[ "${{ steps.real_model.outcome }}" != 'success' ]]; then
+            adb exec-out screencap -p > ci-evidence/model-post-run.png || true
+          fi
+      - name: Upload emulator evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: wakeguard-api36-evidence
+          path: ci-evidence
+          retention-days: 14
+
+  real-vision-gate:
+    needs: [verify, emulator]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Require functional CI and genuine model assertions
+        env:
+          BUILD: ${{ needs.verify.result }}
+          EMULATOR: ${{ needs.emulator.result }}
+          MODEL: ${{ needs.emulator.outputs.model_gate }}
+        run: |
+          echo "Build=$BUILD emulator=$EMULATOR model=$MODEL"
+          if [[ "$BUILD" != 'success' || "$EMULATOR" != 'success' || "$MODEL" != 'success' ]]; then
+            echo '::error::The functional and production-model gates must pass. Read the emulator evidence before release.'
+            exit 1
+          fi
+          echo 'Historical fixture gate passed. Independent holdout and live-camera signoff are still required.'

@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 import subprocess
+import tempfile
 import zipfile
 from pathlib import Path
 
@@ -20,9 +21,9 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
-    def adb(*command, input_bytes=None, timeout=90):
+    def adb(*command, timeout=90):
         result = subprocess.run(["adb", "-s", args.serial, *command],
-            input=input_bytes, check=True, capture_output=True, timeout=timeout)
+            check=True, capture_output=True, timeout=timeout)
         return result.stdout
 
     if adb("shell", "getprop", "ro.kernel.qemu").strip() != b"1":
@@ -45,8 +46,21 @@ def main():
         archive.writestr("cases.json", json.dumps(pairs))
     for apk in (args.apk, args.test_apk):
         print(adb("install", "-r", str(apk)).decode("utf8").strip(),flush=True)
-    adb("shell","-T", f"run-as {APP} sh -c 'mkdir -p files/round2 && cat > files/round2/input.zip'",
-        input_bytes=bundle.getvalue())
+    incoming = bundle.getvalue()
+    digest = hashlib.sha256(incoming).hexdigest()
+    staged = f"/data/local/tmp/wakeguard-round2-{digest[:12]}.zip"
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with tempfile.TemporaryDirectory(dir=args.output.parent) as directory:
+            local = Path(directory) / "dataset.zip"
+            local.write_bytes(incoming)
+            adb("push", str(local), staged)
+        adb("shell", f"run-as {APP} sh -c 'mkdir -p files/round2 && cp {staged} files/round2/input.zip'")
+        remote = adb("shell", "run-as", APP, "sha256sum", "files/round2/input.zip").split()[0].decode()
+        if remote != digest:
+            raise RuntimeError("Device dataset digest differs from the reviewed bundle")
+    finally:
+        adb("shell", "rm", "-f", staged)
     result = adb("shell","am","instrument","-w","-r","-e","class",TEST,"-e","localDataset","1",RUNTIME,timeout=300)
     args.output.with_suffix(".log").write_bytes(result)
     if b"OK (1 test)" not in result:
