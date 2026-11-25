@@ -21,9 +21,11 @@ import com.mikuwwl.wakeguard.data.WakeEventEntity
 import com.mikuwwl.wakeguard.data.WakeGuardDatabase
 import com.mikuwwl.wakeguard.alarm.AlarmForegroundService
 import com.mikuwwl.wakeguard.data.WakeOutcome
+import com.mikuwwl.wakeguard.alarm.WakeGuardDiagnosticExporter
 import com.mikuwwl.wakeguard.presentation.MainActivity
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -73,6 +75,7 @@ class AlarmFlowInstrumentedTest {
         composeRule.onNodeWithText("闹钟可靠性检查").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("前台闹钟服务").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("需用户手动检查").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("export_diagnostics").performScrollTo().assertIsDisplayed()
     }
 
     @Test fun userCanEditAndDeleteAnAlarm() = runBlocking {
@@ -135,6 +138,7 @@ class AlarmFlowInstrumentedTest {
         composeRule.waitUntil(10_000) {
             composeRule.onAllNodesWithText("开始现场验证").fetchSemanticsNodes().isNotEmpty()
         }
+        assertTrue(composeRule.onAllNodesWithTag("export_diagnostics").fetchSemanticsNodes().isEmpty())
         composeRule.onNodeWithTag("start_verification").performClick()
         composeRule.waitUntil(30_000) {
             composeRule.onAllNodesWithTag("camera_preview").fetchSemanticsNodes().isNotEmpty()
@@ -177,6 +181,20 @@ class AlarmFlowInstrumentedTest {
         composeRule.waitUntil(10_000) {
             composeRule.onAllNodesWithTag("resume_alarm_service").fetchSemanticsNodes().isNotEmpty()
         }
+        val activeBeforeExport = database.wakeEventDao().getById(eventId)!!
+        val serviceBeforeExport = AlarmForegroundService.isScheduledOrRunning(context)
+        val exportFile = withContext(Dispatchers.IO) {
+            WakeGuardDiagnosticExporter.export(context, activeBeforeExport, activeBeforeExport)
+        }
+        try {
+            assertEquals(WakeOutcome.RINGING, database.wakeEventDao().getById(eventId)?.outcome)
+            assertEquals(eventId, database.wakeEventDao().getActive()?.id)
+            assertEquals(serviceBeforeExport, AlarmForegroundService.isScheduledOrRunning(context))
+            assertTrue(exportFile.exists())
+        } finally {
+            exportFile.delete()
+        }
+
         composeRule.onNodeWithTag("resume_alarm_service").assertIsDisplayed().performClick()
         composeRule.waitUntil(10_000) {
             com.mikuwwl.wakeguard.alarm.AlarmForegroundService.isScheduledOrRunning(context)

@@ -29,7 +29,11 @@ Statuses reflect observed evidence. AVD behavior is not physical iQOO acceptance
 | R4-23 | FAIL | Run 45585131166 rerun on `deee9fc`: `verify` and 25/25 API 36 functional instrumentation passed. TC01 task 36 was removed and its alarm delivered. TC02's ADB swipe left task 37 and the card present while the same event, foreground service and MediaPlayer remained active. The emulator job and fail-closed `real-vision-gate` failed; the model gate and artifact upload passed. This did not establish playback after actual active-task removal. |
 | R4-24 | PASS | Local ARM64-v8a and x86_64 alpha.4 candidates built, v2 signatures and matching alpha.3 debug certificate verified, hashes recorded. |
 | R4-25 | PASS | Corrected Recents-closure harness, local rerun review, CI result and updated acceptance report/matrix are committed and pushed. Raw AVD and CI evidence remains in the local reports directory and linked artifact. |
-| R4-26 | BLOCKED | Alpha.4 publication gate requires physical `PASS_NATIVE` or `PASS_WITH_OEM_CONFIGURATION`; no release will be published now. |
+| R4-26 | BLOCKED | Final alpha.4 publication still requires physical `PASS_NATIVE` or `PASS_WITH_OEM_CONFIGURATION`. Owner authorization for the separately versioned alpha.4-rc.1 experimental manual-test prerelease does not satisfy this gate. |
+
+## Round 4B evidence
+
+The app now exposes **导出诊断日志** in the existing reliability card. The export is generated only after an explicit tap, uses an app-private cache file and read-only FileProvider sharing, and does not start/stop playback, alter a wake event, enter camera verification, or change emergency-stop behavior. Its formatter redacts identifying strings in reasons and omits free-form process-exit descriptions. Bounded local results: JVM **20/20**, API 36 functional instrumentation **26/26**, production-model acceptance **1/1**, lint **0 errors**, both APK builds **PASS**. The strict Recents test was not rerun. See [ROUND4_MANUAL_IQOO_TEST_GUIDE.md](ROUND4_MANUAL_IQOO_TEST_GUIDE.md) and [ROUND4B_EXPERIMENTAL_DELIVERY.md](ROUND4B_EXPERIMENTAL_DELIVERY.md) for evidence and publication status.
 
 ## Release gate
 

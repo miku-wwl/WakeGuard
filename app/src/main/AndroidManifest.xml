@@ -35,6 +35,16 @@
             android:foregroundServiceType="mediaPlayback"
             android:stopWithTask="false" />
 
+        <provider
+            android:name=".alarm.WakeGuardFileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/diagnostic_file_paths" />
+        </provider>
+
         <receiver android:name=".alarm.AlarmTriggerReceiver" android:exported="false" />
         <receiver android:name=".alarm.AlarmRestoreReceiver" android:exported="false">
             <intent-filter>

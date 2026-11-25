@@ -11,3 +11,5 @@
 - Model gate samples remain small: 4/6 positive including 1/2 independent and 0/5 obvious unrelated. This is not a general accuracy estimate.
 - Candidate APKs use the Android debug certificate. ARM64 physical runtime and install on the target phone are untested.
 - Alpha.4 remains unpublished until physical acceptance reaches `PASS_NATIVE` or `PASS_WITH_OEM_CONFIGURATION` and the remaining release gates pass.
+- Round 4B diagnostic export is user-initiated and local until the owner chooses a share target. It reports public Android permission/battery status and app lifecycle data, while OriginOS proprietary switches still require manual inspection. Free-form system process-exit descriptions are omitted to avoid exporting paths or other sensitive text.
+- `v0.1.0-alpha.4-rc.1`, if published, is an owner-authorized experimental test distribution only; it does not close the physical gate, resolve the reported defect, or imply that all CI gates passed. Final alpha.4 remains blocked.

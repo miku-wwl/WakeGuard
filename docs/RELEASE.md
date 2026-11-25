@@ -1,8 +1,14 @@
 # Build and release
 
-## Current release gate (Round 4)
+## Round 4B experimental prerelease
 
-The last published prerelease is v0.1.0-alpha.3. Round 4 has prepared local experimental v0.1.0-alpha.4 APKs (`versionCode=4`) but the owner-reported iQOO Neo9 Pro recent-task swipe defect has not been physically retested. Do not publish alpha.4 until the device passes ordinary task-removal acceptance under a documented default or owner-approved OEM configuration. See [Round 4 final acceptance](acceptance/ROUND4_FINAL_ACCEPTANCE_REPORT.md) and [test matrix](acceptance/ROUND4_TEST_MATRIX.md).
+`v0.1.0-alpha.4-rc.1` is an owner-authorized experimental distribution for manual iQOO Neo9 Pro testing. It uses `versionCode=4`, `versionName=0.1.0-alpha.4-rc.1`, and the existing debug signing certificate. It is **not** final alpha.4 acceptance and must remain labeled **EXPERIMENTAL — NOT PHYSICALLY VALIDATED**. Record every CI gate as observed; do not imply that the strict Recents gate passed.
+
+The final `v0.1.0-alpha.4` gate remains blocked until the owner-reported recent-task swipe defect passes physical acceptance on the documented default or owner-approved OriginOS configuration, with the remaining mandatory gates satisfied. See [manual iQOO test guide](acceptance/ROUND4_MANUAL_IQOO_TEST_GUIDE.md), [Round 4 final acceptance](acceptance/ROUND4_FINAL_ACCEPTANCE_REPORT.md), and [Round 4B delivery record](acceptance/ROUND4B_EXPERIMENTAL_DELIVERY.md).
+
+## Current final-release gate (Round 4)
+
+The last historically validated prerelease is v0.1.0-alpha.3. Round 4's local v0.1.0-alpha.4 candidates and the separately identified alpha.4-rc.1 manual-test candidate are not a final alpha.4 release. Do not publish final alpha.4 until the owner-reported iQOO Neo9 Pro recent-task swipe defect passes ordinary task-removal acceptance under a documented default or owner-approved OEM configuration. See [Round 4 final acceptance](acceptance/ROUND4_FINAL_ACCEPTANCE_REPORT.md) and [test matrix](acceptance/ROUND4_TEST_MATRIX.md).
 
 ## Round 3 published baseline
 

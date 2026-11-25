@@ -85,6 +85,7 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mikuwwl.wakeguard.R
+import com.mikuwwl.wakeguard.alarm.WakeGuardDiagnosticExporter
 import com.mikuwwl.wakeguard.alarm.AlarmForegroundService
 import com.mikuwwl.wakeguard.alarm.WakeGuardDiagnostics
 import com.mikuwwl.wakeguard.data.AlarmEntity
@@ -256,7 +257,14 @@ private fun WakeGuardRoot(
                     )
                     Route.STATS -> StatisticsScreen(events, Modifier.padding(insets))
                     else -> androidx.compose.runtime.key(refreshToken, permissionUpdates) {
-                        SettingsScreen(repository, notificationPermission, refreshToken, Modifier.padding(insets))
+                        SettingsScreen(
+                            repository = repository,
+                            notificationPermission = notificationPermission,
+                            refreshToken = refreshToken,
+                            activeEvent = activeEvent,
+                            latestEvent = events.firstOrNull(),
+                            modifier = Modifier.padding(insets),
+                        )
                     }
                 }
             }
@@ -592,6 +600,8 @@ private fun SettingsScreen(
     repository: WakeGuardRepository,
     notificationPermission: androidx.activity.result.ActivityResultLauncher<String>,
     refreshToken: Long,
+    activeEvent: WakeEventEntity?,
+    latestEvent: WakeEventEntity?,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -627,7 +637,7 @@ private fun SettingsScreen(
                 }
             }
         }
-        item { ReliabilityStatusCard(context, refreshToken) }
+        item { ReliabilityStatusCard(context, refreshToken, activeEvent, latestEvent) }
         item {
             val cameraModelReady = modelStatus
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
@@ -662,7 +672,15 @@ private fun SettingsScreen(
 }
 
 @Composable
-private fun ReliabilityStatusCard(context: android.content.Context, refreshToken: Long) {
+private fun ReliabilityStatusCard(
+    context: android.content.Context,
+    refreshToken: Long,
+    activeEvent: WakeEventEntity?,
+    latestEvent: WakeEventEntity?,
+) {
+    val scope = rememberCoroutineScope()
+    var isExporting by remember { mutableStateOf(false) }
+    var exportStatus by remember { mutableStateOf("") }
     val alarmManager = remember(context) { context.getSystemService(AlarmManager::class.java) }
     val notificationManager = remember(context) { context.getSystemService(NotificationManager::class.java) }
     val activityManager = remember(context) { context.getSystemService(ActivityManager::class.java) }
@@ -715,6 +733,38 @@ private fun ReliabilityStatusCard(context: android.content.Context, refreshToken
                 onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))) } },
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("打开 WakeGuard 应用设置") }
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth().testTag("export_diagnostics"),
+                enabled = !isExporting,
+                onClick = {
+                    isExporting = true
+                    exportStatus = ""
+                    scope.launch {
+                        val result = runCatching {
+                            withContext(Dispatchers.IO) {
+                                WakeGuardDiagnosticExporter.export(context, activeEvent, latestEvent)
+                            }
+                        }
+                        result.fold(
+                            onSuccess = { file ->
+                                runCatching {
+                                    context.startActivity(WakeGuardDiagnosticExporter.createShareChooser(context, file))
+                                }.onSuccess {
+                                    exportStatus = "已生成诊断文件。系统分享面板不会自动发送，请手动选择接收应用。"
+                                }.onFailure {
+                                    exportStatus = "诊断文件已生成，但无法打开系统分享面板。"
+                                }
+                            },
+                            onFailure = { exportStatus = "诊断日志导出失败，请稍后重试。" },
+                        )
+                        isExporting = false
+                    }
+                },
+            ) { Text(if (isExporting) "正在生成…" else "导出诊断日志") }
+            if (exportStatus.isNotBlank()) {
+                Text(exportStatus, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text("仅在你点击后生成本地文件；分享对象由你在系统分享面板中选择。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

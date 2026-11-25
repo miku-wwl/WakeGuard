@@ -115,16 +115,21 @@ internal object WakeGuardDiagnostics {
                 it.event == "PROCESS_EXIT_INFO" && it.timestamp == exit.timestamp
             }
             if (alreadyRecorded) return
-            val description = exit.description?.take(96)?.replace('\n', ' ')
+            val descriptionStatus = if (exit.description.isNullOrBlank()) "unavailable" else "redacted"
             record(
                 context = context,
                 event = "PROCESS_EXIT_INFO",
-                reason = "${exitReasonName(exit.reason)}; status=${exit.status}; importance=${exit.importance}; description=${description.orEmpty()}",
+                reason = "${exitReasonName(exit.reason)}; status=${exit.status}; importance=${exit.importance}; description=$descriptionStatus",
                 timestamp = exit.timestamp,
                 pid = exit.pid,
             )
         }.onFailure { Log.w(TAG, "Could not inspect previous process exit", it) }
     }
+
+    fun readRecent(context: Context, limit: Int): List<DiagnosticRecord> =
+        log(context).readLast(limit.coerceIn(0, 400))
+
+    internal fun processExitReasonName(reason: Int): String = exitReasonName(reason)
 
     private fun log(context: Context) = BoundedDiagnosticLog(File(context.applicationContext.filesDir, FILE_NAME))
 

@@ -4,7 +4,7 @@ Date: 2026-11-25 (Pacific/Auckland)
 
 ## 1. Executive summary
 
-**Verdict: BLOCKED — PHYSICAL ACCEPTANCE UNAVAILABLE.** Round 4 implements Android-compliant service and state-reconciliation changes, bounded local lifecycle diagnostics, and an explicit user-resume path. JVM, lint, build, API 36 functional instrumentation, and the production-model fixture gate passed. Corrected local evidence confirmed future-alarm delivery after task removal and one active-alarm task removal with playback retained. Repeated active removals were inconsistent: the second local attempt and first CI attempt left the task present. The Recents-closure false negative has been corrected. The owner-reported iQOO Neo9 Pro behavior remains unverified because the phone was not connected. Alpha.4 remains a local experimental candidate only; alpha.3 is the last published prerelease.
+**Verdict: BLOCKED — PHYSICAL ACCEPTANCE UNAVAILABLE.** Round 4 implements Android-compliant service and state-reconciliation changes, bounded local lifecycle diagnostics, and an explicit user-resume path. Round 4B adds user-initiated sanitized diagnostic export and a Chinese physical-test guide. JVM, lint, build, API 36 functional instrumentation, and the production-model fixture gate passed. Corrected local evidence confirmed future-alarm delivery after task removal and one active-alarm task removal with playback retained. Repeated active removals were inconsistent: the second local attempt and first CI attempt left the task present. The owner-reported iQOO Neo9 Pro behavior remains unverified. An alpha.4-rc.1 experimental manual-test prerelease is being prepared; final alpha.4 remains blocked.
 
 ## 2. Owner-reported physical defect
 
@@ -49,7 +49,9 @@ The only attached test target was the existing API 36 x86_64 `WakeGuard_API36` A
 - Added a visible, same-event **继续响铃** action when the persisted event remains active but the service cannot be confirmed. Terminal events cannot be resumed.
 - Added local bounded diagnostics and system process-exit metadata.
 - Added live Android reliability status and transparent manual OriginOS checks.
-- Set candidate version to `0.1.0-alpha.4` / versionCode 4.
+- Round 4B adds a user-initiated, read-only diagnostic export in app-private cache with a scoped FileProvider URI. Free-form process-exit descriptions are omitted from the exported report; the owner chooses whether and where to share it.
+- Added [the Chinese manual iQOO test guide](ROUND4_MANUAL_IQOO_TEST_GUIDE.md), including distinctions between uninterrupted playback, automatic recovery, and user-confirmed **继续响铃** recovery.
+- The manual-test candidate uses `0.1.0-alpha.4-rc.1` / versionCode 4.
 
 No vision model, inference runtime, fixture, threshold or 12-second policy window changed.
 
@@ -71,6 +73,8 @@ There is no physical before/after comparison. CI run 45585131166 confirmed that 
 - Dedicated task-removal harness: **PARTIAL**. CI run 45585131166 TC01 removed task ID 36 and the one-time alarm later delivered and played. TC02's gesture did not remove task ID 37 or its card, while the same event, foreground service and MediaPlayer remained active; this does not prove behavior after active task removal. The corrected local run removed task ID 225 once with same-event playback retained, but its next swipe left task ID 226 present. Emergency cleanup recorded `EMERGENCY_STOP`, `verified_count=0`, and no service remaining. Three active task removals and physical behavior remain untested.
 - Scheduled full CameraX flow with task removal and ordinary process recovery: **PARTIAL**. Earlier lifecycle steps passed, but the AVD's selected live scene did not qualify within 35 seconds; emergency cleanup passed.
 - A Round 4 camera-screen-off rerun did not observe `Asleep` after its AVD key events. Round 3 has separate prior AVD screen-off evidence; neither result establishes physical screen-off behavior.
+
+Round 4B bounded local verification added a formatter privacy test and instrumented export/share checks. Results: JVM **20/20 PASS**; lint **0 errors, 34 warnings, 4 hints**; debug and test APK builds **PASS**; API 36 functional instrumentation **26/26 PASS**; production-model acceptance **1/1 PASS**. The export test verified app-private cache output, scoped read-only URI sharing, event/service state preservation, and redaction. The separate Round 4 strict Recents gate was not rerun.
 
 See [ROUND4_TEST_MATRIX.md](ROUND4_TEST_MATRIX.md) and local raw evidence under `D:\workshop\nov\reports\round4`.
 
@@ -100,7 +104,7 @@ Physical acceptance and OriginOS settings remain unavailable. `START_STICKY` is 
 
 ## 18. Final commit and release status
 
-Product implementation commit: `8d5d92d101d0a9c8ed35c579d90a1b28473b0080`. Strict harness and evidence correction commits: `03393692ecafe3f35c37c5d15113028dafab53ef` and `9b3f8099c3f91bf8ebe057668d93f1b6fdf86350`. Instrumentation synchronization fix: `deee9fc5b044b2cd49d1864438651d9ebed29233`. The final CI report and matrix are included in the follow-up documentation commit. Alpha.4 is not published. Alpha.3 remains the historical emulator-validated prerelease. No release tag or GitHub release for alpha.4 will be created until physical acceptance reaches `PASS_NATIVE` or `PASS_WITH_OEM_CONFIGURATION` and all other mandatory gates pass.
+Product implementation commit: `8d5d92d101d0a9c8ed35c579d90a1b28473b0080`. Strict harness and evidence correction commits: `03393692ecafe3f35c37c5d15113028dafab53ef` and `9b3f8099c3f91bf8ebe057668d93f1b6fdf86350`. Instrumentation synchronization fix: `deee9fc5b044b2cd49d1864438651d9ebed29233`. Round 4B is preparing the separately named `v0.1.0-alpha.4-rc.1` experimental prerelease under the owner's manual-testing authorization; it does not claim physical acceptance or a green strict Recents gate. Final `v0.1.0-alpha.4` remains blocked until physical acceptance reaches `PASS_NATIVE` or `PASS_WITH_OEM_CONFIGURATION` and all other mandatory gates pass. See [ROUND4B_EXPERIMENTAL_DELIVERY.md](ROUND4B_EXPERIMENTAL_DELIVERY.md) for the final delivery record.
 
 ## 19. Final verdict
 
