@@ -2,7 +2,7 @@
 
 ## 1. Executive summary
 
-**CI and release status: pending the first pushed Round 3 candidate.** Local Windows/API 36 checks passed, including the revised real-model gate and three actual scheduled CameraX-to-`VERIFIED` AVD runs. A scheduled obvious-unrelated CameraX run stayed unverified and was explicitly emergency-stopped. APK candidates were built, signature-checked and hashed. The GitHub Actions run and release decision will be added after push; no release is published at this stage.
+**Acceptance: PASS — ALPHA RELEASE READY.** The implementation at `55a4f1837ce816ddfdc777072774018e8aab6a97` passed GitHub Actions on attempt 2 after the first attempt stopped during plugin resolution. Local Windows/API 36 checks passed, including the revised real-model gate and three scheduled CameraX-to-`VERIFIED` AVD runs. The unrelated-scene run remained unverified and was explicitly emergency-stopped. The debug-signed APKs were checksum- and signature-verified. Prerelease [v0.1.0-alpha.3](https://github.com/miku-wwl/WakeGuard/releases/tag/v0.1.0-alpha.3) is published; all three assets are reachable and their remote sizes match.
 
 WakeGuard is **a personal anti-snooze alarm with lightweight offline camera verification**, not a high-precision computer vision system or an authentication product.
 
@@ -72,7 +72,19 @@ A scheduled pharmacy-scene run produced 14 actual CameraX frames with sink 0, to
 
 ## 14. GitHub Actions results
 
-Implementation commit, workflow URL and exact job results: **pending push**. The revised CI has mandatory JVM/lint/build/signing, API 36 functional instrumentation, and production-model gate jobs. The historical strict gate is a separate diagnostic. A GitHub Release will not be created before the final pushed implementation's mandatory workflow is green.
+GitHub Actions [run 45545722112](https://github.com/miku-wwl/WakeGuard/actions/runs/45545722112) tested implementation commit `55a4f1837ce816ddfdc777072774018e8aab6a97`. Attempt 1 stopped in `verify` because the Compose plugin marker could not be resolved; the log did not expose an HTTP cause. Attempt 2 on the same source commit passed all mandatory jobs, with no source or Gradle configuration changes between attempts.
+
+- `verify`: PASS. 19/19 JVM tests; lint 0 errors, 29 warnings and 4 hints; both ABI APK checksums and `apksigner` verification passed.
+- `emulator`: PASS. API 36 functional instrumentation 20/20, 0 failures; production-model acceptance 1/1.
+- `real-vision-gate`: PASS. Policy C accepted 4/6 labeled positives including 1/2 independent positives and 0/5 obvious unrelated scenes.
+- The historical strict vision test remains a non-blocking diagnostic. CI uploaded functional XML, real-model JSON, Logcat, build/lint output and APKs.
+
+CI-generated APK checksums (these are separate runner-built APKs; release asset checksums are in section 18):
+
+| CI artifact | SHA-256 |
+|---|---|
+| `app-x86_64-debug.apk` | `51e0c6a6362049a9cb1a3ab6d657e4ad807d4d37ff3f2402fcf0b601f4542d65` |
+| `app-arm64-v8a-debug.apk` | `00aa70ed2f5f288ee160ad8aab4efd436a400353bbc602ddfa473f7dc88bab78` |
 
 ## 15. APK size and performance
 
@@ -80,13 +92,14 @@ The x86_64 APK is 55,842,299 bytes; ARM64-v8a is 52,688,869 bytes. Both have ver
 
 ## 16. Acceptance matrix
 
-See [all 30 criteria](ROUND3_TEST_MATRIX.md). All local P0 alarm, anti-dismissal, model and cleanup criteria passed on the AVD. CI, permanent final commit and release rows are updated after remote delivery.
+See [all 30 criteria](ROUND3_TEST_MATRIX.md). Local P0 alarm, anti-dismissal, model and cleanup criteria passed on the AVD. GitHub CI passed on the implementation commit, permanent acceptance evidence is tracked in this directory, and the alpha release assets were verified after publication.
 
 ## 17. GitHub commit and release URL
 
-- Tested implementation commit: **pending push**.
-- Permanent acceptance commit: **pending push**.
-- GitHub prerelease: [v0.1.0-alpha.3](https://github.com/miku-wwl/WakeGuard/releases/tag/v0.1.0-alpha.3) — publish only if mandatory gates pass; currently pending.
+- Tested implementation commit: [`55a4f1837ce816ddfdc777072774018e8aab6a97`](https://github.com/miku-wwl/WakeGuard/commit/55a4f1837ce816ddfdc777072774018e8aab6a97).
+- CI run: [Android CI 45545722112](https://github.com/miku-wwl/WakeGuard/actions/runs/45545722112), final attempt 2 succeeded.
+- GitHub prerelease: [v0.1.0-alpha.3](https://github.com/miku-wwl/WakeGuard/releases/tag/v0.1.0-alpha.3), tag target verified as the tested implementation commit.
+- The release page contains the x86_64 APK (55,842,299 bytes), ARM64-v8a APK (52,688,869 bytes), and `SHA256SUMS.txt` (207 bytes). All three download URLs returned HTTP 200 and the APK byte counts matched local files.
 
 ## 18. APK checksums
 
@@ -95,7 +108,7 @@ See [all 30 criteria](ROUND3_TEST_MATRIX.md). All local P0 alarm, anti-dismissal
 | `WakeGuard-0.1.0-alpha.3-x86_64.apk` | `43da2a0487b209411359e102f9692c79f9c07920ca429a83be6ecba351d504f3` |
 | `WakeGuard-0.1.0-alpha.3-arm64-v8a.apk` | `7a03fba90f4f7fbe42b4f1e17c4e98af03cc74606394a8626703912a9c3204c2` |
 
-The matching `SHA256SUMS.txt` is also attached to the prerelease if published.
+The matching `SHA256SUMS.txt` is attached to the published prerelease.
 
 ## 19. Known limitations
 
@@ -103,4 +116,4 @@ The labeled samples are small; Policy C accepts 3/33 incomplete historical scene
 
 ## 20. Final verdict
 
-**PENDING GITHUB CI.** Local evidence supports the experimental alpha acceptance. Final `PASS — ALPHA RELEASE READY` and publication require green mandatory GitHub Actions on the pushed implementation and successful artifact verification. If a mandatory gate fails, verdict becomes PARTIAL and no release is published.
+**PASS — ALPHA RELEASE READY.** The implementation CI, local alarm and CameraX end-to-end gates, resource cleanup, debug signatures and checksums passed. The GitHub prerelease is published and its assets are downloadable. This is a personal-use experimental alpha, not production certification or physical-device acceptance.

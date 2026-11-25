@@ -21,9 +21,9 @@ For the scheduled local-camera walkthrough, use the scoped harness in `tools/rou
 ## Implementation and release
 
 - Base: Round 2 `2486dc75deb83e79aef203b62915fb9d597783ba`.
-- Implementation SHA: recorded in the Round 3 final acceptance report after push.
-- GitHub Actions run: recorded there after the pushed implementation run completes.
-- Tag: `v0.1.0-alpha.3`, only if the documented release gates pass.
+- Implementation SHA: `55a4f1837ce816ddfdc777072774018e8aab6a97`.
+- GitHub Actions: [run 45545722112](https://github.com/miku-wwl/WakeGuard/actions/runs/45545722112), final attempt 2 passed the mandatory gates.
+- Published prerelease: [v0.1.0-alpha.3](https://github.com/miku-wwl/WakeGuard/releases/tag/v0.1.0-alpha.3); tag points to the tested implementation commit and all assets were download-checked.
 - x86_64 runtime is tested on API 36 emulator. ARM64-v8a is build/signature checked only. Physical phones are untested.
 - Local user artifacts and raw evidence stay under `D:\workshop\nov\reports\round3` and `D:\workshop\nov\releases\round3`; they are not all committed. Sanitized permanent evidence and screenshots are committed here.
 

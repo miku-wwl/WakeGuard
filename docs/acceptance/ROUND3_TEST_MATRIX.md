@@ -30,10 +30,10 @@ Statuses describe evidence, not an aggregate score. Local emulator evidence is d
 | R3-24 | PASS | 19 JVM tests pass. | JDK 25.0.4 local; project bytecode target 17. |
 | R3-25 | PASS | 16 API 36 functional Android tests pass. | Local AVD. |
 | R3-26 | PASS | New production-model gate asserts ≥4/6, ≥1 independent and 0/5 obvious unrelated; passed. | Historical strict gate remains a named diagnostic. |
-| R3-27 | PENDING | Final pushed commit's GitHub Actions run. | Update after push and verify the actual run URL. |
+| R3-27 | PASS | GitHub Actions run 45545722112 passed on implementation commit 55a4f1837ce816ddfdc777072774018e8aab6a97 (attempt 2). | Attempt 1 failed before compile during Compose plugin resolution; retry on the same source passed all mandatory jobs. API 36 regression 20/20. |
 | R3-28 | PASS | x86_64 and ARM64-v8a APKs built, v2 signatures and SHA-256 verified. | x86_64 runtime tested; ARM64 build/signature only. |
-| R3-29 | PENDING | Permanent acceptance evidence and screenshots prepared in this directory. | Set PASS after commit/push. |
-| R3-30 | PENDING | GitHub alpha prerelease is gated on final CI and release criteria. | Publish only after green CI, then verify asset URLs. |
+| R3-29 | PASS | Sanitized report, matrix, metrics, limitations, handover and representative screenshots are tracked under docs/acceptance/. | Full raw logs and large fixture data remain in the local reports directory. |
+| R3-30 | PASS | Published prerelease v0.1.0-alpha.3 targets the tested implementation commit; APK and checksum assets are downloadable. | Debug-signed experimental alpha; not production certified. |
 
 ## P0 review
 
