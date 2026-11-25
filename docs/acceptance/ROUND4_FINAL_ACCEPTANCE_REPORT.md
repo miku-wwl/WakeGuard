@@ -34,8 +34,8 @@ The only attached test target was the existing API 36 x86_64 `WakeGuard_API36` A
 
 - Playback resources are event-scoped and owned by `AlarmForegroundService`, not the Activity.
 - The prior manifest relied on the Android default for `stopWithTask`; omission alone did not establish the physical failure cause.
-- In the latest CI TC01 artifact (run 45577205967), task ID 36 and its card were absent after the future-alarm swipe. Android closed Recents after its last card was removed; the alarm subsequently delivered and playback started. The harness incorrectly labeled this partial because it required Recents to remain open.
-- In CI TC02, task ID 37 remained after the first active-playback swipe. Playback, the same `RINGING` event and foreground service remained active while the task stayed present.
+- In the latest CI rerun (45585131166), TC01 removed task ID 36 and the one-time alarm later delivered with playback. Android closed Recents after its final card disappeared; the corrected harness accepts this when the exact task ID and card are absent.
+- In that CI run's TC02, the ADB-generated upward gesture did not remove task ID 37 or its Recents card. The same `RINGING` event, foreground service and MediaPlayer stayed active. This is not evidence of playback after an actual active-task removal.
 - In a corrected local TC02 rerun, the first active swipe removed task ID 225; event 11, its foreground service and MediaPlayer remained active. After reopening the app, a second swipe left task ID 226 present and the same event remained active. The run stopped there and emergency cleanup completed.
 - A separate idle-state smoke swipe removed a task from Recents, but this does not reproduce task removal with an alarm scheduled or active.
 - Ordinary sticky recovery and same-event state checks passed in the scheduled AVD flow before its live camera scene failed to qualify.
@@ -59,7 +59,7 @@ No OEM switch was changed or required by emulator acceptance. On the iQOO, first
 
 ## 10. Before/after device behavior
 
-There is no physical before/after comparison. CI run 45577205967 verified that the future-alarm swipe removed task ID 36 and the one-time alarm later delivered with playback. The Recents surface closed after the last card was removed; this is why the old harness returned a false partial. In a corrected local TC02 run, the first active swipe removed task ID 225 while event 11, its service and MediaPlayer stayed active. A second local swipe after reopening left task ID 226 present; CI's active swipe also left task ID 37 present. No physical active-alarm result exists, so the reported iQOO defect remains open.
+There is no physical before/after comparison. CI run 45585131166 confirmed that a future-alarm swipe removed task ID 36 and the one-time alarm later delivered with playback. In its active-alarm scenario, the ADB gesture left task ID 37 and its card present; the same event, foreground service and MediaPlayer remained active. A corrected local run removed active task ID 225 once with playback retained, but a later swipe left reopened task ID 226 present. No physical active-alarm result exists, so the reported iQOO defect remains open.
 
 ## 11. Automated regression
 
@@ -68,7 +68,7 @@ There is no physical before/after comparison. CI run 45577205967 verified that t
 - Android lint: **0 errors, 32 warnings, 4 hints**.
 - Debug and instrumentation APK builds: passed.
 - Production model gate: **4/6** labeled positives, **1/2** independent positives, **0/5** obvious unrelated scenes accepted; the existing gate and policy remained unchanged.
-- Dedicated task-removal harness: **PARTIAL**. Manual CI artifact review confirmed TC01 task ID 36 and card disappeared, and its one-time alarm later delivered and played; the old harness wrongly required Recents to remain open and returned PARTIAL. In the corrected local run, TC01 passed and the first active TC02 swipe removed task ID 225 while the same event, foreground service and MediaPlayer remained active. The next local attempt left task ID 226 present; CI run 45577205967 also left task ID 37 present on active swipe 1. Both local events were emergency-stopped with `verified_count=0`; three repeated removals were not completed. Physical behavior remains untested.
+- Dedicated task-removal harness: **PARTIAL**. CI run 45585131166 TC01 removed task ID 36 and the one-time alarm later delivered and played. TC02's gesture did not remove task ID 37 or its card, while the same event, foreground service and MediaPlayer remained active; this does not prove behavior after active task removal. The corrected local run removed task ID 225 once with same-event playback retained, but its next swipe left task ID 226 present. Emergency cleanup recorded `EMERGENCY_STOP`, `verified_count=0`, and no service remaining. Three active task removals and physical behavior remain untested.
 - Scheduled full CameraX flow with task removal and ordinary process recovery: **PARTIAL**. Earlier lifecycle steps passed, but the AVD's selected live scene did not qualify within 35 seconds; emergency cleanup passed.
 - A Round 4 camera-screen-off rerun did not observe `Asleep` after its AVD key events. Round 3 has separate prior AVD screen-off evidence; neither result establishes physical screen-off behavior.
 
@@ -84,7 +84,7 @@ The app retains the explicit confirmation-gated emergency stop. Local AVD and in
 
 ## 14. GitHub CI
 
-Run [45577205967](https://github.com/miku-wwl/WakeGuard/actions/runs/45577205967) tested final documentation-head SHA `f925bd3c9365abe60fc322eca250cd0020d79c36` (source then unchanged from `0339369`). `verify`, API 36 functional instrumentation and the lightweight model gate passed. Artifact review confirmed TC01 task ID 36 and its card disappeared; the one-time alarm later delivered and played. The old harness returned a false partial because Recents closed after its last card was removed. CI TC02 active swipe left task ID 37 present while the same event, foreground service and MediaPlayer remained active, so the emulator job and fail-closed `real-vision-gate` failed. The corrected local run removed active task ID 225 once with the same event and playback preserved, then failed to remove reopened task ID 226 on attempt 2. Both local events were emergency-stopped with `verified_count=0`; evidence uploaded. The Recents-closure fix is in the current working tree and awaits CI. Physical iQOO remains separate and untested. Full CI evidence is in `D:\workshop\nov\reports\round4\ci-45577205967`.
+Run [45585131166](https://github.com/miku-wwl/WakeGuard/actions/runs/45585131166) tested source SHA `deee9fc5b044b2cd49d1864438651d9ebed29233`. The first emulator attempt hit a transient Gradle plugin-resolution failure; the failed jobs were rerun. On rerun, `verify` passed JVM tests, lint, dual-ABI APK builds, checksums and signature verification; all 25 API 36 functional instrumentation tests passed; the lightweight production-model gate passed at 4/6 positives, 1/2 independent positives and 0/5 obvious unrelated scenes; the historical strict diagnostic passed. TC01 task ID 36 and card disappeared and the one-time alarm later delivered with playback. TC02 did not remove task ID 37 or its card, while the same event, foreground service and MediaPlayer stayed active. Therefore the emulator job and fail-closed `real-vision-gate` failed. Safety cleanup stopped event 2 as `EMERGENCY_STOP`, left `verified_count=0`, and removed the foreground service. The corrected local run did remove active task ID 225 once with the same event and playback preserved, but its next swipe left task ID 226 present. Full CI evidence is in `D:\workshop\nov\reports\round4\ci-45585131166-final`; physical iQOO remains separate and untested.
 
 ## 15. Acceptance matrix
 
@@ -100,7 +100,7 @@ Physical acceptance and OriginOS settings remain unavailable. `START_STICKY` is 
 
 ## 18. Final commit and release status
 
-Product implementation commit: `8d5d92d101d0a9c8ed35c579d90a1b28473b0080`. Strict harness and evidence correction commit: `03393692ecafe3f35c37c5d15113028dafab53ef`. The final CI report and matrix are included in the repository revision. Alpha.4 is not published. Alpha.3 remains the historical emulator-validated prerelease. No release tag or GitHub release for alpha.4 will be created until physical acceptance reaches `PASS_NATIVE` or `PASS_WITH_OEM_CONFIGURATION` and all other mandatory gates pass.
+Product implementation commit: `8d5d92d101d0a9c8ed35c579d90a1b28473b0080`. Strict harness and evidence correction commits: `03393692ecafe3f35c37c5d15113028dafab53ef` and `9b3f8099c3f91bf8ebe057668d93f1b6fdf86350`. Instrumentation synchronization fix: `deee9fc5b044b2cd49d1864438651d9ebed29233`. The final CI report and matrix are included in the follow-up documentation commit. Alpha.4 is not published. Alpha.3 remains the historical emulator-validated prerelease. No release tag or GitHub release for alpha.4 will be created until physical acceptance reaches `PASS_NATIVE` or `PASS_WITH_OEM_CONFIGURATION` and all other mandatory gates pass.
 
 ## 19. Final verdict
 
