@@ -35,7 +35,14 @@ def swipe_task(device: Device, prefix: str) -> bool:
         return False
     left, top, right, bottom = bounds
     x = (left + right) // 2
-    device.shell("input", "swipe", str(x), str(max(top + 100, bottom - 200)), str(x), str(max(100, top - 100)), "250")
+    # Keep the gesture inside the task card. A ringing alarm can show a heads-up
+    # notification over the top of Recents; ending at y=100 pulls that overlay or
+    # status area instead of dismissing the app task on API 36.
+    start_y = top + int((bottom - top) * 0.78)
+    end_y = max(top + 220, 420)
+    if start_y <= end_y:
+        start_y = min(bottom - 100, end_y + 500)
+    device.shell("input", "swipe", str(x), str(start_y), str(x), str(end_y), "180")
     time.sleep(1.5)
     after = device.dump_ui(f"{prefix}-recents-after")
     device.screenshot(f"{prefix}-recents-after")
@@ -145,10 +152,35 @@ def main() -> int:
             time.sleep(1)
             same_event = device.assert_active_event(event_id, "RINGING")
             service_running = device.foreground_service()
-            device.capture(f"tc02-active-swipe-{index}-service", "dumpsys", "activity", "services", PKG)
-            device.capture(f"tc02-active-swipe-{index}-audio", "dumpsys", "audio")
+            service_dump = device.capture(f"tc02-active-swipe-{index}-service", "dumpsys", "activity", "services", PKG)
+            audio_dump = device.capture(f"tc02-active-swipe-{index}-audio", "dumpsys", "audio")
+            swipe_result = {
+                "attempt": index,
+                "task_removed": removed,
+                "same_event_id": int(same_event["id"]),
+                "service_running": service_running,
+                "media_player_started": "state:started" in audio_dump and "type:android.media.MediaPlayer" in audio_dump and "com.mikuwwl.wakeguard" in audio_dump,
+                "service_dump_has_foreground": "isForeground=true" in service_dump,
+            }
+            (args.evidence / f"tc02-active-swipe-{index}-state.json").write_text(json.dumps(swipe_result, indent=2), encoding="utf-8")
+            progress_case = {
+                "id": "TC02_TC03",
+                "status": "PARTIAL",
+                "alarm_id": alarm_id,
+                "event_id": int(event_id),
+                "removals": removals + [swipe_result],
+                "same_event_retained": int(same_event["id"]) == int(event_id),
+                "outcome_after_removals": same_event["outcome"],
+            }
+            result["cases"] = [case for case in result["cases"] if case["id"] != "TC02_TC03"] + [progress_case]
+            (args.evidence / "acceptance-progress.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
             if not removed or not service_running or int(same_event["id"]) != int(event_id):
-                raise AssertionError(f"Task swipe {index} stopped or changed active playback state.")
+                failed = [name for name, ok in (
+                    ("task_removed", removed),
+                    ("service_running", service_running),
+                    ("same_event_id", int(same_event["id"]) == int(event_id)),
+                ) if not ok]
+                raise AssertionError(f"Task swipe {index} failed checks: {', '.join(failed)}; observed {swipe_result}.")
             device.start_app()
             time.sleep(0.7)
             ui = device.dump_ui(f"tc02-active-swipe-{index}-reopened")
@@ -157,6 +189,7 @@ def main() -> int:
 
         tc02_records = diagnostics(device, "tc02")
         callback_count = sum(1 for r in tc02_records if r.get("event") == "TASK_REMOVED" and r.get("eventId") == int(event_id))
+        result["cases"] = [case for case in result["cases"] if case["id"] != "TC02_TC03"]
         result["cases"].append({
             "id": "TC02_TC03",
             "status": "PASS",
