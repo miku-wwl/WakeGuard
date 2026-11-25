@@ -2,12 +2,14 @@ package com.mikuwwl.wakeguard.presentation
 
 import android.Manifest
 import android.app.AlarmManager
+import android.app.ActivityManager
 import android.app.NotificationManager
 import android.content.Intent
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -60,8 +62,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -81,6 +85,8 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mikuwwl.wakeguard.R
+import com.mikuwwl.wakeguard.alarm.AlarmForegroundService
+import com.mikuwwl.wakeguard.alarm.WakeGuardDiagnostics
 import com.mikuwwl.wakeguard.data.AlarmEntity
 import com.mikuwwl.wakeguard.data.WakeEventEntity
 import com.mikuwwl.wakeguard.data.WakeGuardRepository
@@ -88,6 +94,7 @@ import com.mikuwwl.wakeguard.data.WakeOutcome
 import com.mikuwwl.wakeguard.domain.VerificationPolicy
 import com.mikuwwl.wakeguard.vision.CameraVerificationScreen
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Instant
@@ -138,6 +145,7 @@ private fun WakeGuardRoot(
     repository: WakeGuardRepository,
     refreshToken: Long,
 ) {
+    val context = LocalContext.current
     val alarms by repository.alarms.collectAsStateWithLifecycle(emptyList())
     val activeEvent by repository.activeEvent.collectAsStateWithLifecycle(null)
     val events by repository.recentEvents.collectAsStateWithLifecycle(emptyList())
@@ -153,6 +161,21 @@ private fun WakeGuardRoot(
         permissionUpdates++
     }
     val eventId = activeEvent?.id
+    var serviceCheckToken by remember { mutableIntStateOf(0) }
+    var playbackServiceRunning by remember(eventId) { mutableStateOf(false) }
+    LaunchedEffect(eventId, refreshToken, serviceCheckToken) {
+        playbackServiceRunning = false
+        if (eventId != null) {
+            for (attempt in 0 until 8) {
+                val running = withContext(Dispatchers.IO) {
+                    runCatching { AlarmForegroundService.isScheduledOrRunning(context) }.getOrDefault(false)
+                }
+                playbackServiceRunning = running
+                if (running) break
+                delay(350)
+            }
+        }
+    }
     val screen = when {
         eventId == null -> route
         eventId == cameraEventId -> Route.VERIFY
@@ -171,9 +194,16 @@ private fun WakeGuardRoot(
                 onSave = { alarm -> scope.launch { repository.saveAlarm(alarm); route = Route.HOME } },
             )
             Route.RINGING -> AlarmRingingScreen(
+                playbackServiceRunning = playbackServiceRunning,
                 onStartVerification = {
                     if (eventId != null) scope.launch {
                         if (repository.beginVerification(eventId)) cameraEventId = eventId
+                    }
+                },
+                onResumePlayback = {
+                    if (eventId != null) scope.launch {
+                        repository.resumeActiveAlarm(eventId)
+                        serviceCheckToken++
                     }
                 },
                 onEmergencyStop = { emergencyEventId = eventId },
@@ -226,7 +256,7 @@ private fun WakeGuardRoot(
                     )
                     Route.STATS -> StatisticsScreen(events, Modifier.padding(insets))
                     else -> androidx.compose.runtime.key(refreshToken, permissionUpdates) {
-                        SettingsScreen(repository, notificationPermission, Modifier.padding(insets))
+                        SettingsScreen(repository, notificationPermission, refreshToken, Modifier.padding(insets))
                     }
                 }
             }
@@ -452,7 +482,12 @@ private fun TimePickerDialog(context: android.content.Context, initialHour: Int,
 }
 
 @Composable
-private fun AlarmRingingScreen(onStartVerification: () -> Unit, onEmergencyStop: () -> Unit) {
+private fun AlarmRingingScreen(
+    playbackServiceRunning: Boolean,
+    onStartVerification: () -> Unit,
+    onResumePlayback: () -> Unit,
+    onEmergencyStop: () -> Unit,
+) {
     Box(Modifier.fillMaxSize().background(Color(0xFF0D1D1B)), contentAlignment = Alignment.Center) {
         Column(Modifier.fillMaxWidth().padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
             Box(Modifier.size(92.dp).clip(CircleShape).background(Color(0xFFB5E8D0)), contentAlignment = Alignment.Center) {
@@ -460,13 +495,23 @@ private fun AlarmRingingScreen(onStartVerification: () -> Unit, onEmergencyStop:
             }
             Text("正在响铃，请起床。", color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
             Text("请前往洗手池附近。", color = Color(0xFFC2D3D0), style = MaterialTheme.typography.bodyLarge)
+            if (!playbackServiceRunning) {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("播放服务未确认运行。系统或设备厂商可能已回收后台进程。", color = MaterialTheme.colorScheme.onErrorContainer)
+                        Button(onClick = onResumePlayback, modifier = Modifier.fillMaxWidth().testTag("resume_alarm_service")) {
+                            Text("继续响铃")
+                        }
+                    }
+                }
+            }
             Button(onClick = onStartVerification, modifier = Modifier.fillMaxWidth().height(56.dp).testTag("start_verification")) { Text("开始现场验证") }
             OutlinedButton(
                 onClick = onEmergencyStop,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
             ) { Text("紧急停止（记录为未完成）") }
-            Text("返回键不会关闭闹钟。按 Home 后，声音与通知会继续。", color = Color(0xFF93AAA5), style = MaterialTheme.typography.bodySmall)
+            Text("闹钟由前台服务播放，独立于此界面。系统停止应用或厂商后台策略仍可能终止播放。", color = Color(0xFF93AAA5), style = MaterialTheme.typography.bodySmall)
         }
     }
 }
@@ -546,6 +591,7 @@ private fun EventRow(event: WakeEventEntity) {
 private fun SettingsScreen(
     repository: WakeGuardRepository,
     notificationPermission: androidx.activity.result.ActivityResultLauncher<String>,
+    refreshToken: Long,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -581,6 +627,7 @@ private fun SettingsScreen(
                 }
             }
         }
+        item { ReliabilityStatusCard(context, refreshToken) }
         item {
             val cameraModelReady = modelStatus
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
@@ -611,6 +658,72 @@ private fun SettingsScreen(
             text = { Text(notices, Modifier.height(360.dp).verticalScroll(rememberScrollState()).padding(4.dp), style = MaterialTheme.typography.bodySmall) },
             confirmButton = { TextButton(onClick = { showLicenses = false }) { Text("关闭") } },
         )
+    }
+}
+
+@Composable
+private fun ReliabilityStatusCard(context: android.content.Context, refreshToken: Long) {
+    val alarmManager = remember(context) { context.getSystemService(AlarmManager::class.java) }
+    val notificationManager = remember(context) { context.getSystemService(NotificationManager::class.java) }
+    val activityManager = remember(context) { context.getSystemService(ActivityManager::class.java) }
+    val powerManager = remember(context) { context.getSystemService(PowerManager::class.java) }
+    val exactAlarm = remember(refreshToken) {
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.S || runCatching { alarmManager.canScheduleExactAlarms() }.getOrDefault(false)
+    }
+    val notificationsEnabled = remember(refreshToken) {
+        val runtimeGranted = Build.VERSION.SDK_INT < 33 || context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        runtimeGranted && notificationManager.areNotificationsEnabled()
+    }
+    val fullScreenAllowed = remember(refreshToken) {
+        Build.VERSION.SDK_INT < 34 || runCatching { notificationManager.canUseFullScreenIntent() }.getOrDefault(false)
+    }
+    val batteryStatus = remember(refreshToken) {
+        if (Build.VERSION.SDK_INT < 23) "此 Android 版本不提供状态"
+        else if (runCatching { powerManager.isIgnoringBatteryOptimizations(context.packageName) }.getOrDefault(false)) "已豁免电池优化"
+        else "系统电池优化可能生效"
+    }
+    val backgroundStatus = remember(refreshToken) {
+        if (Build.VERSION.SDK_INT < 28) "此 Android 版本不提供状态"
+        else if (runCatching { activityManager.isBackgroundRestricted }.getOrDefault(false)) "受系统后台限制"
+        else "未检测到系统后台限制"
+    }
+    val serviceStatus = remember(refreshToken) {
+        runCatching { AlarmForegroundService.isScheduledOrRunning(context) }.fold(
+            onSuccess = { if (it) "正在运行" else "未运行" },
+            onFailure = { "无法读取" },
+        )
+    }
+    val exitSummary = remember(refreshToken) { WakeGuardDiagnostics.latestProcessExitSummary(context) }
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("闹钟可靠性检查", style = MaterialTheme.typography.titleMedium)
+            ReliabilityRow("精确闹钟", if (exactAlarm) "已允许" else "未允许")
+            ReliabilityRow("通知", if (notificationsEnabled) "已允许" else "未允许")
+            ReliabilityRow("锁屏全屏通知", if (fullScreenAllowed) "已允许" else "未允许")
+            ReliabilityRow("电池优化", batteryStatus)
+            ReliabilityRow("后台运行限制", backgroundStatus)
+            ReliabilityRow("前台闹钟服务", serviceStatus)
+            ReliabilityRow("设备", "${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
+            ReliabilityRow("上次系统进程退出", exitSummary)
+            ReliabilityRow("OriginOS 自启动 / 后台高耗电 / 最近任务锁定", "需用户手动检查")
+            Text("厂商设置因 OriginOS 版本和机型而异；应用无法通过公开 Android API 查询这些开关。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedButton(
+                onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) } },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("查看系统电池优化设置") }
+            OutlinedButton(
+                onClick = { runCatching { context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))) } },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("打开 WakeGuard 应用设置") }
+        }
+    }
+}
+
+@Composable
+private fun ReliabilityRow(label: String, value: String) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(label, modifier = Modifier.weight(0.8f), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, modifier = Modifier.weight(1.2f))
     }
 }
 

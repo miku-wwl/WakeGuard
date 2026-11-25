@@ -73,17 +73,17 @@ jobs:
           export ANDROID_AVD_HOME="$RUNNER_TEMP/wakeguard-avd"
           mkdir -p "$ANDROID_AVD_HOME"
           echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
-          "$sdk/avdmanager" create avd -n WakeGuard_API36_CI \
+          "$sdk/avdmanager" create avd -n WakeGuard_API36 \
             -k 'system-images;android-36;google_apis;x86_64' --device pixel_7 \
-            -p "$ANDROID_AVD_HOME/WakeGuard_API36_CI.avd" </dev/null 2>&1 | tee ci-evidence/avd-create.txt
+            -p "$ANDROID_AVD_HOME/WakeGuard_API36.avd" </dev/null 2>&1 | tee ci-evidence/avd-create.txt
           "$ANDROID_HOME/emulator/emulator" -list-avds | tee ci-evidence/avds.txt
-          test -s "$ANDROID_AVD_HOME/WakeGuard_API36_CI.avd/config.ini"
-          grep -Fxq WakeGuard_API36_CI ci-evidence/avds.txt
+          test -s "$ANDROID_AVD_HOME/WakeGuard_API36.avd/config.ini"
+          grep -Fxq WakeGuard_API36 ci-evidence/avds.txt
       - name: Boot emulator
         id: boot
         run: |
           "$ANDROID_HOME/emulator/emulator" -accel-check | tee ci-evidence/acceleration.txt
-          "$ANDROID_HOME/emulator/emulator" -avd WakeGuard_API36_CI -no-window -no-snapshot -no-boot-anim \
+          "$ANDROID_HOME/emulator/emulator" -avd WakeGuard_API36 -no-window -no-snapshot -no-boot-anim \
             -gpu swiftshader -feature -Vulkan -camera-back emulated -camera-front none \
             >ci-evidence/emulator.log 2>&1 &
           emulator_pid=$!
@@ -117,6 +117,17 @@ jobs:
           if [[ "${{ steps.functional.outcome }}" != 'success' ]]; then
             adb exec-out screencap -p > ci-evidence/functional-post-run.png || true
           fi
+      - name: Install debug APK on the disposable AVD for task-removal test
+        if: always() && steps.functional.outcome == 'success'
+        run: adb install -r app/build/outputs/apk/debug/app-x86_64-debug.apk
+      - name: Run Round 4 Recents task-removal regression
+        id: task_removal
+        if: always() && steps.functional.outcome == 'success'
+        run: |
+          mkdir -p ci-evidence/task-removal
+          python3 tools/round4/emulator_task_removal_e2e.py \
+            --serial emulator-5554 \
+            --evidence ci-evidence/task-removal
       - name: Enforce lightweight policy with production models
         if: always() && steps.boot.outcome == 'success'
         id: lightweight_model

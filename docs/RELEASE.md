@@ -1,6 +1,12 @@
 # Build and release
 
-Round 3 targets `v0.1.0-alpha.3` (`versionName=0.1.0-alpha.3`, `versionCode=3`). This is a personal-use experimental alpha, not a production-certified Android alarm. It uses debug signing and is not intended for Google Play.
+## Current release gate (Round 4)
+
+The last published prerelease is v0.1.0-alpha.3. Round 4 has prepared local experimental v0.1.0-alpha.4 APKs (`versionCode=4`) but the owner-reported iQOO Neo9 Pro recent-task swipe defect has not been physically retested. Do not publish alpha.4 until the device passes ordinary task-removal acceptance under a documented default or owner-approved OEM configuration. See [Round 4 final acceptance](acceptance/ROUND4_FINAL_ACCEPTANCE_REPORT.md) and [test matrix](acceptance/ROUND4_TEST_MATRIX.md).
+
+## Round 3 published baseline
+
+Round 3 published `v0.1.0-alpha.3` (`versionName=0.1.0-alpha.3`, `versionCode=3`). This is a personal-use experimental alpha, not a production-certified Android alarm. It uses debug signing and is not intended for Google Play.
 
 Build both ABI APKs and verify them with Android Build Tools:
 

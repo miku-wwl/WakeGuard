@@ -93,7 +93,7 @@ class AlarmCoordinatorTest {
         assertFalse(registration.current.containsKey(oneTime))
     }
 
-    @Test fun reopeningAfterSystemStopInterruptsButNeverReplaysATerminalEvent() = runBlocking {
+    @Test fun foregroundReconciliationPreservesSameEventWhenServiceIsTemporarilyAbsent() = runBlocking {
         val id = alarms.save(AlarmEntity(hour = 10, minute = 0))
         val due = registration.current.getValue(id)
         time = due.dueAt
@@ -102,9 +102,30 @@ class AlarmCoordinatorTest {
         assertEquals(event, db.wakeEventDao().getActive()?.id)
         serviceOwned = false
         alarms.restore(AlarmRestore.FOREGROUND)
-        assertEquals(WakeOutcome.INTERRUPTED, db.wakeEventDao().getById(event)?.outcome)
+        assertEquals(WakeOutcome.RINGING, db.wakeEventDao().getById(event)?.outcome)
+        assertEquals(event, db.wakeEventDao().getActive()?.id)
+        assertFalse(alarms.finish(event, verified = true))
+        assertTrue(alarms.finish(event, verified = false))
+        alarms.restore(AlarmRestore.FOREGROUND)
+        assertEquals(WakeOutcome.EMERGENCY_STOP, db.wakeEventDao().getById(event)?.outcome)
         assertNull(db.wakeEventDao().getActive())
         alarms.whileActive(event) { error("Terminal session should not resume playback") }
+    }
+
+    @Test fun bootInterruptionIsExactlyOnceAndTerminalEventsAreNotResurrected() = runBlocking {
+        val id = alarms.save(AlarmEntity(hour = 10, minute = 0))
+        val due = registration.current.getValue(id)
+        time = due.dueAt
+        val event = alarms.deliver(due) {}!!
+        time++
+        alarms.restore(AlarmRestore.BOOT)
+        val interruptedAt = db.wakeEventDao().getById(event)?.finishedAt
+        assertEquals(WakeOutcome.INTERRUPTED, db.wakeEventDao().getById(event)?.outcome)
+        alarms.restore(AlarmRestore.BOOT)
+        assertEquals(WakeOutcome.INTERRUPTED, db.wakeEventDao().getById(event)?.outcome)
+        assertEquals(interruptedAt, db.wakeEventDao().getById(event)?.finishedAt)
+        assertNull(db.wakeEventDao().getActive())
+        alarms.whileActive(event) { error("Boot-interrupted session must not be replayed") }
     }
 
     private class FakeRegistration : AlarmRegistration {

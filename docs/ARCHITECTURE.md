@@ -24,6 +24,8 @@ Each registration has a due epoch and unique token. Editing, disabling, or delet
 
 The foreground service owns one event, audio player, vibration request, notification, and wake lock. Playback callbacks recheck event and player ownership before they act. A sticky restart reads the active Room event and resumes that same event. Terminal state releases its playback resources and removes its ongoing notification. Emergency stop remains an explicitly confirmed, unverified terminal result.
 
+Activity foreground reconciliation does not terminalize an active event merely because a service lookup is temporarily empty. If the visible app still sees that same active Room event without a confirmed playback service, it offers a user-controlled resume action; terminal events are not resumed. `onTaskRemoved()` records the event and leaves service ownership intact without a self-restart loop. See [Round 4 acceptance](acceptance/ROUND4_FINAL_ACCEPTANCE_REPORT.md).
+
 ```mermaid
 stateDiagram-v2
     [*] --> SCHEDULED

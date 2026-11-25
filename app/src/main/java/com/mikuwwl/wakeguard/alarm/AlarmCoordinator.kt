@@ -19,10 +19,12 @@ internal class AlarmCoordinator(
     private val registration: AlarmRegistration,
     private val clock: () -> Long = System::currentTimeMillis,
     private val hasSystemService: () -> Boolean = { true },
+    private val diagnosticsContext: Context? = null,
 ) {
     constructor(context: Context) : this(
         WakeGuardDatabase.get(context), AlarmScheduler(context.applicationContext),
         hasSystemService = { AlarmForegroundService.isScheduledOrRunning(context.applicationContext) },
+        diagnosticsContext = context.applicationContext,
     )
 
     private val alarms = db.alarmDao()
@@ -57,8 +59,26 @@ internal class AlarmCoordinator(
 
     suspend fun restore(reason: AlarmRestore) = mutex.withLock {
         val now = clock()
-        if (reason == AlarmRestore.BOOT || (reason == AlarmRestore.FOREGROUND && !hasSystemService())) {
-            events.interruptActive(now)
+        val activeBeforeRestore = events.getActive()
+        if (reason == AlarmRestore.BOOT) {
+            val interrupted = events.interruptActive(now)
+            if (interrupted > 0) {
+                diagnosticsContext?.let { context -> WakeGuardDiagnostics.record(
+                    context = context,
+                    event = "EVENT_INTERRUPTED",
+                    eventId = activeBeforeRestore?.id,
+                    alarmId = activeBeforeRestore?.alarmId,
+                    reason = "device_boot",
+                ) }
+            }
+        } else if (reason == AlarmRestore.FOREGROUND && !hasSystemService() && activeBeforeRestore != null) {
+            diagnosticsContext?.let { context -> WakeGuardDiagnostics.record(
+                context = context,
+                event = "ACTIVE_EVENT_SERVICE_ABSENT",
+                eventId = activeBeforeRestore.id,
+                alarmId = activeBeforeRestore.alarmId,
+                reason = "foreground_reconciliation_preserved_event",
+            ) }
         }
         for (alarm in alarms.getEnabled()) {
             val delivery = AlarmDelivery.from(alarm)
@@ -101,6 +121,13 @@ internal class AlarmCoordinator(
             alarms.update(consumed)
             row.copy(id = events.insert(row))
         }
+        diagnosticsContext?.let { context -> WakeGuardDiagnostics.record(
+            context = context,
+            event = "ALARM_TRIGGERED",
+            eventId = event.id,
+            alarmId = alarm.id,
+            reason = if (event.outcome == WakeOutcome.RINGING) "accepted" else "overlapping_missed",
+        ) }
         registration.cancel(alarm)
         if (repeating) schedule(consumed, now)
         if (event.outcome == WakeOutcome.RINGING) {
@@ -118,7 +145,17 @@ internal class AlarmCoordinator(
     }
 
     suspend fun finish(eventId: Long, verified: Boolean, now: Long = clock()): Boolean = mutex.withLock {
-        if (verified) events.finishVerified(eventId, now) == 1 else events.finishEmergency(eventId, now) == 1
+        val event = events.getById(eventId)
+        val finished = if (verified) events.finishVerified(eventId, now) == 1 else events.finishEmergency(eventId, now) == 1
+        if (finished) {
+            diagnosticsContext?.let { context -> WakeGuardDiagnostics.record(
+                context = context,
+                event = if (verified) "VERIFIED" else "EMERGENCY_STOP",
+                eventId = eventId,
+                alarmId = event?.alarmId,
+            ) }
+        }
+        finished
     }
 
     suspend fun fail(eventId: Long) = mutex.withLock { events.failActive(eventId, clock()) }
@@ -133,6 +170,13 @@ internal class AlarmCoordinator(
         val delivery = AlarmDelivery(alarm.id, scheduledAt, UUID.randomUUID().toString())
         val token = delivery.token.takeIf { registration.register(delivery) }
         alarms.update(alarm.copy(scheduledAt = scheduledAt, deliveryToken = token))
+        diagnosticsContext?.let { context -> WakeGuardDiagnostics.record(
+            context = context,
+            event = "ALARM_SCHEDULED",
+            alarmId = alarm.id,
+            reason = if (token == null) "registration_denied" else "registered",
+            timestamp = now,
+        ) }
         if (token == null) Log.w(TAG, "Alarm ${alarm.id} saved without exact registration")
     }
 

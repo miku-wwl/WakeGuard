@@ -103,6 +103,8 @@ object AlarmIntents {
     const val EXTRA_EVENT_ID = "com.mikuwwl.wakeguard.extra.EVENT_ID"
     const val EXTRA_SCHEDULED_AT = "com.mikuwwl.wakeguard.extra.SCHEDULED_AT"
     const val EXTRA_DELIVERY_TOKEN = "com.mikuwwl.wakeguard.extra.DELIVERY_TOKEN"
+    const val EXTRA_START_REASON = "com.mikuwwl.wakeguard.extra.START_REASON"
+    const val START_REASON_USER_CONFIRMED_RESUME = "user_confirmed_resume"
     const val ACTION_TRIGGER = "com.mikuwwl.wakeguard.action.TRIGGER"
     const val ACTION_SHOW_ALARM = "com.mikuwwl.wakeguard.action.SHOW_ALARM"
 }

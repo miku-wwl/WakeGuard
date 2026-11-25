@@ -30,6 +30,12 @@ Use `--restart-process-first --remove-task-first` on the API 36 AVD to capture o
 
 The real vision test is separate from injected-engine UI tests: its fixture scores come from actual bundled Android models. The scheduled CameraX evidence additionally proves a live `ImageProxy` model result through the production path. Static fixtures do not prove user presence or real-world camera liveness.
 
+## Round 4 task-removal and physical gate
+
+The emulator-only task-removal harness is `tools/round4/emulator_task_removal_e2e.py`. It requires an explicit API 36 AVD serial, verifies future alarm delivery after task removal, repeats active task removal three times, and emergency-stops the active test event. Do not use the destructive emulator harness on a physical device.
+
+Physical iQOO acceptance is a separate owner-authorized gate. The scoped diagnostic collector is `tools/round4/collect_iqoo_diagnostics.ps1`; supply the explicit authorized serial and retain raw data locally. First record default OEM settings, then run the cases in `docs/acceptance/ROUND4_TEST_MATRIX.md`. Alpha.4 remains unpublished unless the iQOO result is `PASS_NATIVE` or `PASS_WITH_OEM_CONFIGURATION` and all other release gates pass.
+
 ## CI
 
 GitHub Actions runs JVM tests, lint, ABI APK build and signing verification, API 36 functional instrumentation, and the mandatory lightweight model gate. The Round 2 strict test remains a named diagnostic. XML, model logs, screenshots on failure, artifacts, and checksums are uploaded for review. The permanent acceptance report records the final workflow URL and commit SHA.

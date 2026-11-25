@@ -38,22 +38,46 @@ class AlarmForegroundService : Service() {
     private val notifications by lazy { getSystemService(NotificationManager::class.java) }
     private var observing = false
     private var latestStartId = 0
+    private var activeEventId: Long? = null
+    private var activeAlarmId: Long? = null
+    private var taskRemovedCallbackObserved = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    override fun onCreate() {
+        super.onCreate()
+        WakeGuardDiagnostics.record(this, "SERVICE_CREATED")
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         latestStartId = startId
+        val requested = intent?.getLongExtra(AlarmIntents.EXTRA_EVENT_ID, -1L)?.takeIf { it > 0L }
+        val startReason = intent?.getStringExtra(AlarmIntents.EXTRA_START_REASON)
+            ?: if (intent == null) "sticky_null_intent" else "start_intent"
+        WakeGuardDiagnostics.record(this, "SERVICE_STARTED", eventId = requested, reason = startReason)
         if (observing) return START_STICKY
         observing = true
         startForeground(NOTIFICATION_ID, notification(null), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
-        val requested = intent?.getLongExtra(AlarmIntents.EXTRA_EVENT_ID, -1L)
         serviceScope.launch {
             WakeGuardDatabase.get(applicationContext).wakeEventDao().observeActive().collect { event ->
                 if (event == null) {
+                    activeEventId = null
+                    activeAlarmId = null
                     owner.close()
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelfResult(latestStartId)
                 } else {
+                    activeEventId = event.id
+                    activeAlarmId = event.alarmId
+                    if (intent == null || startReason == AlarmIntents.START_REASON_USER_CONFIRMED_RESUME) {
+                        WakeGuardDiagnostics.record(
+                            this@AlarmForegroundService,
+                            "PROCESS_RECOVERED",
+                            eventId = event.id,
+                            alarmId = event.alarmId,
+                            reason = startReason,
+                        )
+                    }
                     owner.start(event.id) { AlarmPlayback(event) }?.let { session ->
                         if (requested != event.id) Log.i(TAG, "Recovered persisted event=${event.id}")
                         notifications.notify(NOTIFICATION_ID, notification(event))
@@ -65,10 +89,33 @@ class AlarmForegroundService : Service() {
         return START_STICKY
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        taskRemovedCallbackObserved = true
+        WakeGuardDiagnostics.record(
+            this,
+            "TASK_REMOVED",
+            eventId = activeEventId,
+            alarmId = activeAlarmId,
+            reason = if (activeEventId == null) "no_cached_active_event" else "activity_task_removed_playback_retained",
+        )
+        // The started foreground service and its event-owned player outlive the Activity task.
+        // Do not stop the service or schedule a self-restart from this callback.
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
+        WakeGuardDiagnostics.record(
+            this,
+            "SERVICE_DESTROYED",
+            eventId = activeEventId,
+            alarmId = activeAlarmId,
+            reason = if (taskRemovedCallbackObserved) "after_task_removed_callback_observed" else "callback_cause_unspecified",
+        )
         serviceScope.cancel()
         owner.close()
         observing = false
+        activeEventId = null
+        activeAlarmId = null
         super.onDestroy()
     }
 
@@ -106,6 +153,7 @@ class AlarmForegroundService : Service() {
         private var vibrator: Vibrator? = null
         private var sources = emptyList<Uri>()
         private var sourceIndex = 0
+        private var closed = false
 
         fun start() {
             wakeLock = runCatching {
@@ -160,6 +208,13 @@ class AlarmForegroundService : Service() {
                                     try {
                                         ready.start()
                                         Log.i(TAG, "Playback active event=${event.id} source=$sourceIndex vibration=${event.vibration}")
+                                        WakeGuardDiagnostics.record(
+                                            this@AlarmForegroundService,
+                                            "PLAYBACK_STARTED",
+                                            eventId = event.id,
+                                            alarmId = event.alarmId,
+                                            reason = "media_player_prepared",
+                                        )
                                     } catch (_: IllegalStateException) {
                                         prepareNextSource()
                                     }
@@ -197,12 +252,21 @@ class AlarmForegroundService : Service() {
         }
 
         override fun close() {
+            if (closed) return
+            closed = true
             releasePlayer()
             vibrator?.cancel()
             vibrator = null
             wakeLock?.let { if (it.isHeld) it.release() }
             wakeLock = null
             Log.i(TAG, "Released playback resources event=${event.id}")
+            WakeGuardDiagnostics.record(
+                this@AlarmForegroundService,
+                "PLAYBACK_RELEASED",
+                eventId = event.id,
+                alarmId = event.alarmId,
+                reason = "playback_owner_closed",
+            )
         }
     }
 

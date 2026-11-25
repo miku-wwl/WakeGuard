@@ -32,7 +32,8 @@
         <service
             android:name=".alarm.AlarmForegroundService"
             android:exported="false"
-            android:foregroundServiceType="mediaPlayback" />
+            android:foregroundServiceType="mediaPlayback"
+            android:stopWithTask="false" />
 
         <receiver android:name=".alarm.AlarmTriggerReceiver" android:exported="false" />
         <receiver android:name=".alarm.AlarmRestoreReceiver" android:exported="false">
