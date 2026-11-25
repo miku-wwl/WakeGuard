@@ -13,4 +13,6 @@ data class AlarmEntity(
     val enabled: Boolean = true,
     val vibration: Boolean = true,
     val ringtoneUri: String? = null,
+    val scheduledAt: Long? = null,
+    val deliveryToken: String? = null,
 )

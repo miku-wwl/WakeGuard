@@ -12,8 +12,8 @@ android {
         applicationId = "com.mikuwwl.wakeguard"
         minSdk = 29
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0-alpha.1"
+        versionCode = 2
+        versionName = "0.1.0-alpha.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }
@@ -31,7 +31,17 @@ android {
     }
 
     buildFeatures { compose = true }
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("x86_64", "arm64-v8a")
+            isUniversalApk = false
+        }
+    }
     packaging.resources.excludes += setOf("/META-INF/{AL2.0,LGPL2.1}")
+    packaging.jniLibs.useLegacyPackaging = true
+    packaging.dex.useLegacyPackaging = true
 }
 
 kotlin {
@@ -49,10 +59,9 @@ dependencies {
 
     implementation(platform("androidx.compose:compose-bom:2026.06.01"))
     implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.navigation:navigation-compose:2.9.8")
 
     implementation("androidx.room:room-runtime:2.8.5")
@@ -74,6 +83,5 @@ dependencies {
     androidTestImplementation("androidx.test:rules:1.7.0")
     androidTestImplementation(platform("androidx.compose:compose-bom:2026.06.01"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
-    debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }

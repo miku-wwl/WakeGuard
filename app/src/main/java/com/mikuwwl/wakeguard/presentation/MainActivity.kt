@@ -9,7 +9,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -36,8 +35,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Alarm
-import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
@@ -64,7 +61,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -77,6 +73,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -84,8 +81,7 @@ import androidx.core.content.IntentCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.mikuwwl.wakeguard.alarm.AlarmForegroundService
-import com.mikuwwl.wakeguard.alarm.AlarmIntents
+import com.mikuwwl.wakeguard.R
 import com.mikuwwl.wakeguard.data.AlarmEntity
 import com.mikuwwl.wakeguard.data.WakeEventEntity
 import com.mikuwwl.wakeguard.data.WakeGuardRepository
@@ -101,45 +97,30 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 class MainActivity : ComponentActivity() {
-    private val alarmIntentId = mutableLongStateOf(-1L)
     private val resumeCounter = mutableLongStateOf(0L)
     private val repository by lazy { WakeGuardRepository(applicationContext) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        consumeAlarmIntent(intent)
+        lifecycleScope.launch {
+            repository.activeEvent.collect { event ->
+                setShowWhenLocked(event != null)
+                setTurnScreenOn(event != null)
+            }
+        }
         setContent {
             WakeGuardRoot(
                 repository = repository,
-                launchAlarmId = alarmIntentId.longValue,
                 refreshToken = resumeCounter.longValue,
-                onLaunchConsumed = { alarmIntentId.longValue = -1L },
             )
         }
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        consumeAlarmIntent(intent)
     }
 
     override fun onResume() {
         super.onResume()
         resumeCounter.longValue += 1
-        lifecycleScope.launch(Dispatchers.IO) { repository.rescheduleEnabledAlarms() }
-    }
-
-    private fun consumeAlarmIntent(intent: Intent?) {
-        if (intent?.action == AlarmIntents.ACTION_SHOW_ALARM) {
-            alarmIntentId.longValue = intent.getLongExtra(AlarmIntents.EXTRA_ALARM_ID, -1L)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-                setShowWhenLocked(true)
-                setTurnScreenOn(true)
-            }
-            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        }
+        lifecycleScope.launch(Dispatchers.IO) { repository.restoreOnForeground() }
     }
 }
 
@@ -156,9 +137,7 @@ private object Route {
 @Composable
 private fun WakeGuardRoot(
     repository: WakeGuardRepository,
-    launchAlarmId: Long,
     refreshToken: Long,
-    onLaunchConsumed: () -> Unit,
 ) {
     val alarms by repository.alarms.collectAsStateWithLifecycle(emptyList())
     val activeEvent by repository.activeEvent.collectAsStateWithLifecycle(null)
@@ -166,34 +145,26 @@ private fun WakeGuardRoot(
     val scope = rememberCoroutineScope()
     var route by rememberSaveable { mutableStateOf(Route.HOME) }
     var editedAlarm by remember { mutableStateOf<AlarmEntity?>(null) }
-    var emergencyPrompt by remember { mutableStateOf(false) }
+    var emergencyEventId by remember { mutableStateOf<Long?>(null) }
     var resultWasSuccess by rememberSaveable { mutableStateOf(false) }
     var resultLabel by rememberSaveable { mutableStateOf("") }
-    var currentEventId by rememberSaveable { mutableLongStateOf(-1L) }
-    val context = LocalContext.current
-    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
-
-    LaunchedEffect(activeEvent?.id, launchAlarmId) {
-        activeEvent?.let {
-            currentEventId = it.id
-            if (route == Route.HOME || route == Route.RESULT) route = Route.RINGING
-        } ?: run {
-            if (route == Route.RINGING || route == Route.VERIFY) route = Route.HOME
-        }
-        if (launchAlarmId > 0L) {
-            route = if (activeEvent != null) Route.RINGING else Route.HOME
-            onLaunchConsumed()
-        }
+    var cameraEventId by remember { mutableStateOf<Long?>(null) }
+    var permissionUpdates by remember { mutableLongStateOf(0L) }
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        permissionUpdates++
     }
-
-    LaunchedEffect(refreshToken) {
-        // Refreshing here rechecks settings grants and also schedules any alarms after access is restored.
+    val eventId = activeEvent?.id
+    val screen = when {
+        eventId == null -> route
+        eventId == cameraEventId -> Route.VERIFY
+        else -> Route.RINGING
     }
+    val exactPermission = remember(refreshToken) { repository.canScheduleExactAlarms() }
 
-    BackHandler(enabled = route == Route.RINGING || route == Route.VERIFY) { /* verification cannot be dismissed by Back */ }
+    BackHandler(enabled = eventId != null) { /* Back never completes an alarm. */ }
 
     WakeGuardTheme {
-        when (route) {
+        when (screen) {
             Route.EDITOR -> AlarmEditorScreen(
                 alarm = editedAlarm,
                 onCancel = { route = Route.HOME },
@@ -201,36 +172,30 @@ private fun WakeGuardRoot(
             )
             Route.RINGING -> AlarmRingingScreen(
                 onStartVerification = {
-                    val eventId = activeEvent?.id ?: currentEventId
-                    if (eventId > 0) {
-                        currentEventId = eventId
-                        scope.launch { repository.beginVerification(eventId) }
-                        route = Route.VERIFY
+                    if (eventId != null) scope.launch {
+                        if (repository.beginVerification(eventId)) cameraEventId = eventId
                     }
                 },
-                onEmergencyStop = { emergencyPrompt = true },
+                onEmergencyStop = { emergencyEventId = eventId },
             )
-            Route.VERIFY -> CameraVerificationScreen(
-                thresholds = repository.thresholds(),
-                onVerified = {
-                    val eventId = activeEvent?.id ?: currentEventId
-                    scope.launch {
-                        val completed = eventId > 0 && repository.finishVerified(eventId)
-                        if (completed) {
-                            AlarmForegroundService.stop(context)
-                            resultWasSuccess = true
-                            resultLabel = "洗手池、牙刷和牙膏均已识别"
-                            route = Route.RESULT
+            Route.VERIFY -> if (eventId != null) androidx.compose.runtime.key(eventId) {
+                val thresholds = remember { repository.thresholds() }
+                CameraVerificationScreen(
+                    thresholds = thresholds,
+                    onVerified = {
+                        scope.launch {
+                            if (repository.finishVerified(eventId)) {
+                                resultWasSuccess = true
+                                resultLabel = "洗手池、牙刷和牙膏均已识别"
+                                route = Route.RESULT
+                            }
                         }
-                    }
-                },
-                onRecordFailedAttempt = {
-                    val eventId = activeEvent?.id ?: currentEventId
-                    if (eventId > 0) scope.launch { repository.recordFailedAttempt(eventId) }
-                },
-                onEmergencyStop = { emergencyPrompt = true },
-                onBackToAlarm = { route = Route.RINGING },
-            )
+                    },
+                    onRecordFailedAttempt = { scope.launch { repository.recordFailedAttempt(eventId) } },
+                    onEmergencyStop = { emergencyEventId = eventId },
+                    onBackToAlarm = { cameraEventId = null },
+                )
+            }
             Route.RESULT -> ResultScreen(
                 success = resultWasSuccess,
                 detail = resultLabel,
@@ -239,8 +204,8 @@ private fun WakeGuardRoot(
             else -> Scaffold(
                 bottomBar = {
                     NavigationBar {
-                        NavigationBarItem(selected = route == Route.HOME, onClick = { route = Route.HOME }, icon = { Icon(Icons.Default.Alarm, null) }, label = { Text("闹钟") })
-                        NavigationBarItem(selected = route == Route.STATS, onClick = { route = Route.STATS }, icon = { Icon(Icons.Default.BarChart, null) }, label = { Text("统计") })
+                        NavigationBarItem(selected = route == Route.HOME, onClick = { route = Route.HOME }, icon = { Icon(painterResource(R.drawable.ic_wakeguard), null) }, label = { Text("闹钟") })
+                        NavigationBarItem(selected = route == Route.STATS, onClick = { route = Route.STATS }, icon = { Icon(painterResource(R.drawable.ic_statistics), null) }, label = { Text("统计") })
                         NavigationBarItem(selected = route == Route.SETTINGS, onClick = { route = Route.SETTINGS }, icon = { Icon(Icons.Default.Settings, null) }, label = { Text("设置") })
                     }
                 },
@@ -254,32 +219,32 @@ private fun WakeGuardRoot(
                 when (route) {
                     Route.HOME -> AlarmListScreen(
                         alarms = alarms,
-                        repository = repository,
+                        exactPermission = exactPermission,
                         onEdit = { editedAlarm = it; route = Route.EDITOR },
                         onToggle = { alarm, enabled -> scope.launch { repository.setEnabled(alarm, enabled) } },
                         onDelete = { alarm -> scope.launch { repository.deleteAlarm(alarm.id) } },
                         modifier = Modifier.padding(insets),
                     )
                     Route.STATS -> StatisticsScreen(events, Modifier.padding(insets))
-                    else -> SettingsScreen(repository, notificationPermission, Modifier.padding(insets))
+                    else -> androidx.compose.runtime.key(refreshToken, permissionUpdates) {
+                        SettingsScreen(repository, notificationPermission, Modifier.padding(insets))
+                    }
                 }
             }
         }
     }
 
-    if (emergencyPrompt) {
+    val stoppingId = emergencyEventId
+    if (stoppingId != null && stoppingId == eventId) {
         AlertDialog(
-            onDismissRequest = { emergencyPrompt = false },
+            onDismissRequest = { emergencyEventId = null },
             title = { Text("紧急停止闹钟？") },
             text = { Text("这会停止声音并记录为未完成验证，不会计为成功。") },
             confirmButton = {
                 Button(onClick = {
-                    emergencyPrompt = false
-                    val eventId = activeEvent?.id ?: currentEventId
+                    emergencyEventId = null
                     scope.launch {
-                        val completed = eventId > 0 && repository.finishEmergency(eventId)
-                        if (completed) {
-                            AlarmForegroundService.stop(context)
+                        if (repository.finishEmergency(stoppingId)) {
                             resultWasSuccess = false
                             resultLabel = "已紧急停止；本次未完成验证"
                             route = Route.RESULT
@@ -287,7 +252,7 @@ private fun WakeGuardRoot(
                     }
                 }) { Text("紧急停止") }
             },
-            dismissButton = { TextButton(onClick = { emergencyPrompt = false }) { Text("继续验证") } },
+            dismissButton = { TextButton(onClick = { emergencyEventId = null }) { Text("继续验证") } },
         )
     }
 }
@@ -295,18 +260,15 @@ private fun WakeGuardRoot(
 @Composable
 private fun AlarmListScreen(
     alarms: List<AlarmEntity>,
-    repository: WakeGuardRepository,
+    exactPermission: Boolean,
     onEdit: (AlarmEntity) -> Unit,
     onToggle: (AlarmEntity, Boolean) -> Unit,
     onDelete: (AlarmEntity) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
-    val exactPermission = remember(context) {
-        val manager = context.getSystemService(AlarmManager::class.java)
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.S || manager.canScheduleExactAlarms()
-    }
-    val nextAlarm = remember(alarms) { alarms.filter { it.enabled }.minByOrNull { repository.nextTriggerAt(it) } }
+    val nextAlarm = if (exactPermission) alarms.asSequence()
+        .filter { it.enabled && it.deliveryToken != null }.mapNotNull { it.scheduledAt }.minOrNull()
+    else null
     var deleteAlarm by remember { mutableStateOf<AlarmEntity?>(null) }
     LazyColumn(
         modifier = modifier.fillMaxSize().testTag("alarm_list"),
@@ -322,19 +284,18 @@ private fun AlarmListScreen(
                     Text("精确闹钟权限未开启。请前往“设置”授权，闹钟才能按时触发。", Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onErrorContainer)
                 }
             }
-            nextAlarm?.let {
-                val next = remember(it) { repository.nextTriggerAt(it) }
+            nextAlarm?.let { next ->
                 Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                     Column(Modifier.padding(18.dp)) {
-                        Text("下一个已启用闹钟", style = MaterialTheme.typography.labelLarge)
-                        Text("${formatTime(it.hour, it.minute)} · ${formatDateTime(next)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text("下一个已排程闹钟", style = MaterialTheme.typography.labelLarge)
+                        Text(formatDateTime(next), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
         }
         if (alarms.isEmpty()) item { EmptyAlarmsCard() }
         items(alarms, key = { it.id }) { alarm ->
-            AlarmCard(alarm, onEdit = { onEdit(alarm) }, onToggle = { onToggle(alarm, it) }, onDelete = { deleteAlarm = alarm })
+            AlarmCard(alarm, exactPermission, onEdit = { onEdit(alarm) }, onToggle = { onToggle(alarm, it) }, onDelete = { deleteAlarm = alarm })
         }
     }
     deleteAlarm?.let { alarm ->
@@ -352,7 +313,7 @@ private fun AlarmListScreen(
 private fun EmptyAlarmsCard() {
     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
         Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.Alarm, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp))
+            Icon(painterResource(R.drawable.ic_wakeguard), null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp))
             Spacer(Modifier.height(8.dp))
             Text("还没有闹钟", style = MaterialTheme.typography.titleMedium)
             Text("添加一个，让明早从清醒开始。", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -361,7 +322,7 @@ private fun EmptyAlarmsCard() {
 }
 
 @Composable
-private fun AlarmCard(alarm: AlarmEntity, onEdit: () -> Unit, onToggle: (Boolean) -> Unit, onDelete: () -> Unit) {
+private fun AlarmCard(alarm: AlarmEntity, exactPermission: Boolean, onEdit: () -> Unit, onToggle: (Boolean) -> Unit, onDelete: () -> Unit) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
         Column(Modifier.padding(horizontal = 18.dp, vertical = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -369,8 +330,11 @@ private fun AlarmCard(alarm: AlarmEntity, onEdit: () -> Unit, onToggle: (Boolean
                     Text(formatTime(alarm.hour, alarm.minute), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Light)
                     Text(alarm.label.ifBlank { "WakeGuard alarm" }, style = MaterialTheme.typography.titleSmall)
                     Text(repeatLabel(alarm.repeatMask), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    if (alarm.enabled && (!exactPermission || alarm.deliveryToken == null)) {
+                        Text("尚未排程", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
-                Switch(checked = alarm.enabled, onCheckedChange = onToggle)
+                Switch(checked = alarm.enabled, onCheckedChange = onToggle, modifier = Modifier.testTag("alarm_enabled"))
             }
             HorizontalDivider(Modifier.padding(vertical = 6.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -444,7 +408,17 @@ private fun AlarmEditorScreen(alarm: AlarmEntity?, onCancel: () -> Unit, onSave:
             }
         }
         Button(
-            onClick = { onSave((alarm ?: AlarmEntity(hour = hour, minute = minute)).copy(label = label.trim().ifBlank { "WakeGuard alarm" }, hour = hour, minute = minute, repeatMask = repeatMask, vibration = vibration, ringtoneUri = ringtoneUri, enabled = true)) },
+            onClick = {
+                val saved = alarm ?: AlarmEntity(hour = hour, minute = minute)
+                onSave(saved.copy(
+                    label = label.trim().ifBlank { "WakeGuard alarm" },
+                    hour = hour,
+                    minute = minute,
+                    repeatMask = repeatMask,
+                    vibration = vibration,
+                    ringtoneUri = ringtoneUri,
+                ))
+            },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp).testTag("save_alarm"),
         ) { Text("保存闹钟") }
     }
@@ -483,7 +457,7 @@ private fun AlarmRingingScreen(onStartVerification: () -> Unit, onEmergencyStop:
     Box(Modifier.fillMaxSize().background(Color(0xFF0D1D1B)), contentAlignment = Alignment.Center) {
         Column(Modifier.fillMaxWidth().padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
             Box(Modifier.size(92.dp).clip(CircleShape).background(Color(0xFFB5E8D0)), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.Alarm, contentDescription = null, tint = Color(0xFF123E34), modifier = Modifier.size(48.dp))
+                Icon(painterResource(R.drawable.ic_wakeguard), contentDescription = null, tint = Color(0xFF123E34), modifier = Modifier.size(48.dp))
             }
             Text("起床时间到了", color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
             Text("走到洗手台，让身体开始新的一天。", color = Color(0xFFC2D3D0), style = MaterialTheme.typography.bodyLarge)
@@ -515,7 +489,7 @@ private fun StatisticsScreen(events: List<WakeEventEntity>, modifier: Modifier =
     val success = events.count { it.outcome == WakeOutcome.VERIFIED }
     val emergency = events.count { it.outcome == WakeOutcome.EMERGENCY_STOP }
     val failedAttempts = events.sumOf { it.failedAttempts }
-    val completed = events.count { it.outcome == WakeOutcome.VERIFIED || it.outcome == WakeOutcome.EMERGENCY_STOP }
+    val completed = events.count { it.finishedAt != null }
     val rate = if (completed == 0) 0 else success * 100 / completed
     LazyColumn(modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(20.dp, 24.dp, 20.dp, 32.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
@@ -554,6 +528,8 @@ private fun EventRow(event: WakeEventEntity) {
         WakeOutcome.VERIFIED -> "验证成功"
         WakeOutcome.EMERGENCY_STOP -> "紧急停止 · 未验证"
         WakeOutcome.INTERRUPTED -> "系统中断"
+        WakeOutcome.MISSED -> "错过闹钟"
+        WakeOutcome.FAILED -> "无法响铃"
         WakeOutcome.VERIFYING, WakeOutcome.RINGING -> "进行中"
         else -> event.outcome
     }

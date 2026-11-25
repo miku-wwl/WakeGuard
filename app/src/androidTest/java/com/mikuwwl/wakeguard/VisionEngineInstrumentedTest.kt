@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -21,6 +22,8 @@ import com.mikuwwl.wakeguard.vision.OnDeviceVisionEngine
 import com.mikuwwl.wakeguard.vision.VisionEngine
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -139,6 +142,104 @@ class VisionEngineInstrumentedTest {
         composeRule.onNodeWithText("需要相机权限进行现场识别").assertIsDisplayed()
         composeRule.onNodeWithText("紧急停止").assertIsDisplayed().performClick()
         assertTrue("The explicit emergency path remains available without camera permission", emergencyRequested.get())
+    }
+
+    @Test fun failedInitializationLeavesVerificationOpenWithEmergencyExit() {
+        grantCamera()
+        val verified = AtomicBoolean(false)
+        val emergency = AtomicBoolean(false)
+        composeRule.setContent {
+            MaterialTheme {
+                CameraVerificationScreen(
+                    VisionThresholds(), { verified.set(true) }, {}, { emergency.set(true) }, {},
+                    engineFactory = { throw IllegalStateException("Injected initialization failure") },
+                )
+            }
+        }
+        composeRule.waitUntil(20_000) {
+            composeRule.onAllNodes(androidx.compose.ui.test.hasText("本地识别暂不可用", substring = true))
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        assertFalse(verified.get())
+        composeRule.onNodeWithText("紧急停止").performClick()
+        assertTrue(emergency.get())
+    }
+
+    @Test fun inferenceFailureBetweenQualifyingFramesResetsCompletion() {
+        grantCamera()
+        val frames = AtomicInteger(0)
+        val verified = AtomicBoolean(false)
+        composeRule.setContent {
+            MaterialTheme {
+                CameraVerificationScreen(
+                    VisionThresholds(), { verified.set(true) }, {}, {}, {},
+                    engineFactory = {
+                        object : VisionEngine {
+                            override fun analyze(bitmap: Bitmap): VisionFrame = when (frames.incrementAndGet()) {
+                                3 -> error("Injected inference error")
+                                in 1..5 -> VisionFrame(1f, 1f, 1f)
+                                else -> VisionFrame(0f, 0f, 0f)
+                            }
+                            override fun close() = Unit
+                        }
+                    },
+                )
+            }
+        }
+        composeRule.waitUntil(20_000) { frames.get() >= 6 }
+        composeRule.waitForIdle()
+        assertFalse(verified.get())
+    }
+
+    @Test fun disposedCameraWaitsForRunningInferenceBeforeClosingTheEngine() {
+        grantCamera()
+        val display = mutableStateOf(true)
+        val inAnalyze = AtomicBoolean(false)
+        val closedDuringAnalyze = AtomicBoolean(false)
+        val closed = AtomicBoolean(false)
+        val verified = AtomicBoolean(false)
+        val release = CountDownLatch(1)
+        composeRule.setContent {
+            MaterialTheme {
+                if (display.value) CameraVerificationScreen(
+                    VisionThresholds(), { verified.set(true) }, {}, {}, { display.value = false },
+                    engineFactory = {
+                        object : VisionEngine {
+                            override fun analyze(bitmap: Bitmap): VisionFrame {
+                                inAnalyze.set(true)
+                                try {
+                                    check(release.await(15, TimeUnit.SECONDS))
+                                    return VisionFrame(1f, 1f, 1f)
+                                } finally {
+                                    inAnalyze.set(false)
+                                }
+                            }
+                            override fun close() {
+                                closedDuringAnalyze.set(inAnalyze.get())
+                                closed.set(true)
+                            }
+                        }
+                    },
+                )
+            }
+        }
+        try {
+            composeRule.waitUntil(20_000) { inAnalyze.get() }
+            composeRule.onNodeWithText("返回闹钟", substring = true).performClick()
+            composeRule.waitForIdle()
+            assertFalse(closed.get())
+        } finally {
+            release.countDown()
+        }
+        composeRule.waitUntil(10_000) { closed.get() }
+        assertFalse(closedDuringAnalyze.get())
+        assertFalse(verified.get())
+    }
+
+    private fun grantCamera() {
+        val app = ApplicationProvider.getApplicationContext<Context>()
+        InstrumentationRegistry.getInstrumentation().uiAutomation
+            .grantRuntimePermission(app.packageName, Manifest.permission.CAMERA)
     }
 
     private fun loadFixture(context: Context, path: String): Bitmap =

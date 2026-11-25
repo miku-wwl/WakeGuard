@@ -1,6 +1,8 @@
 package com.mikuwwl.wakeguard.data
 
 import android.content.Context
+import com.mikuwwl.wakeguard.alarm.AlarmCoordinator
+import com.mikuwwl.wakeguard.alarm.AlarmRestore
 import com.mikuwwl.wakeguard.alarm.AlarmScheduler
 import com.mikuwwl.wakeguard.domain.VisionThresholds
 import kotlinx.coroutines.flow.Flow
@@ -11,6 +13,7 @@ class WakeGuardRepository(context: Context) {
     private val alarmsDao = database.alarmDao()
     private val eventsDao = database.wakeEventDao()
     private val scheduler = AlarmScheduler(appContext)
+    private val coordinator = AlarmCoordinator(appContext)
 
     val alarms: Flow<List<AlarmEntity>> = alarmsDao.observeAll()
     val activeEvent: Flow<WakeEventEntity?> = eventsDao.observeActive()
@@ -18,31 +21,10 @@ class WakeGuardRepository(context: Context) {
 
     fun canScheduleExactAlarms() = scheduler.canScheduleExactAlarms()
 
-    fun nextTriggerAt(alarm: AlarmEntity) = scheduler.nextTriggerAt(alarm)
-
-    suspend fun saveAlarm(alarm: AlarmEntity): Long {
-        val id = if (alarm.id == 0L) alarmsDao.insert(alarm) else {
-            alarmsDao.update(alarm)
-            alarm.id
-        }
-        alarmsDao.getById(id)?.let(scheduler::schedule)
-        return id
-    }
-
-    suspend fun setEnabled(alarm: AlarmEntity, enabled: Boolean) {
-        val updated = alarm.copy(enabled = enabled)
-        alarmsDao.update(updated)
-        if (enabled) scheduler.schedule(updated) else scheduler.cancel(alarm.id)
-    }
-
-    suspend fun deleteAlarm(alarmId: Long) {
-        scheduler.cancel(alarmId)
-        alarmsDao.delete(alarmId)
-    }
-
-    suspend fun rescheduleEnabledAlarms() = scheduler.scheduleEnabledAlarms()
-
-    suspend fun activeEventNow() = eventsDao.getActive()
+    suspend fun saveAlarm(alarm: AlarmEntity): Long = coordinator.save(alarm)
+    suspend fun setEnabled(alarm: AlarmEntity, enabled: Boolean) = coordinator.setEnabled(alarm.id, enabled)
+    suspend fun deleteAlarm(alarmId: Long) = coordinator.delete(alarmId)
+    suspend fun restoreOnForeground() = coordinator.restore(AlarmRestore.FOREGROUND)
 
     suspend fun beginVerification(eventId: Long, now: Long = System.currentTimeMillis()) =
         eventsDao.startVerification(eventId, now) == 1
@@ -50,12 +32,10 @@ class WakeGuardRepository(context: Context) {
     suspend fun recordFailedAttempt(eventId: Long) = eventsDao.recordFailedAttempt(eventId) == 1
 
     suspend fun finishVerified(eventId: Long, now: Long = System.currentTimeMillis()) =
-        eventsDao.finishVerified(eventId, now) == 1
+        coordinator.finish(eventId, verified = true, now = now)
 
     suspend fun finishEmergency(eventId: Long, now: Long = System.currentTimeMillis()) =
-        eventsDao.finishEmergency(eventId, now) == 1
-
-    suspend fun interruptActive(now: Long = System.currentTimeMillis()) = eventsDao.interruptActive(now)
+        coordinator.finish(eventId, verified = false, now = now)
 
     fun thresholds(): VisionThresholds {
         val prefs = appContext.getSharedPreferences("wakeguard_settings", Context.MODE_PRIVATE)

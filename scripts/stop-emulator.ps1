@@ -1,9 +1,13 @@
+param([ValidateRange(5554, 5682)][int]$Port = 5554)
 $ErrorActionPreference = 'Stop'
-$WorkspaceRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-$SdkRoot = Join-Path $WorkspaceRoot 'android-sdk'
-$env:ANDROID_HOME = $SdkRoot
-$env:ANDROID_SDK_ROOT = $SdkRoot
-$env:ANDROID_AVD_HOME = Join-Path $WorkspaceRoot 'android-avd'
-$Adb = Join-Path $SdkRoot 'platform-tools\adb.exe'
-$Devices = & $Adb devices | Select-String '^emulator-\d+\s+device$'
-if ($Devices) { & $Adb -s ($Devices.Line -split '\s+')[0] emu kill; Write-Output 'Sent graceful emulator shutdown.' } else { Write-Output 'No running emulator found.' }
+. (Join-Path $PSScriptRoot 'set-local-environment.ps1')
+$target = "emulator-$Port"
+$adb = Join-Path $env:ANDROID_HOME 'platform-tools\adb.exe'
+if (-not (& $adb devices | Where-Object { $_ -match ('^' + $target + '\s+device\b') })) {
+    Write-Output "WakeGuard_API36 is not connected on $target."
+    return
+}
+$name = & $adb -s $target emu avd name | Select-Object -First 1
+if ($name -ne 'WakeGuard_API36') { throw "Refusing to stop a different AVD on $target." }
+& $adb -s $target emu kill
+if ($LASTEXITCODE -ne 0) { throw 'Emulator shutdown command failed.' }

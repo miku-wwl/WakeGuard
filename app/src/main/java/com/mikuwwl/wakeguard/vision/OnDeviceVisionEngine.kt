@@ -11,6 +11,7 @@ import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import com.mikuwwl.wakeguard.domain.VisionFrame
+import java.nio.ByteBuffer
 import java.nio.FloatBuffer
 import kotlin.math.exp
 
@@ -28,7 +29,7 @@ class OnDeviceVisionEngine(context: Context) : VisionEngine {
     init {
         val appContext = context.applicationContext
         val detectorOptions = ObjectDetectorOptions.builder()
-            .setBaseOptions(BaseOptions.builder().setModelAssetPath("efficientdet_lite0.tflite").build())
+            .setBaseOptions(BaseOptions.builder().setModelAssetBuffer(detectorModel(appContext)).build())
             .setRunningMode(RunningMode.IMAGE)
             .setMaxResults(10)
             .setCategoryAllowlist(listOf("sink", "toothbrush"))
@@ -56,6 +57,7 @@ class OnDeviceVisionEngine(context: Context) : VisionEngine {
             try {
                 for (detection in detector.detect(image).detections()) {
                     for (category in detection.categories()) {
+                        check(category.score() in 0f..1f) { "Invalid detector output" }
                         when (category.categoryName()) {
                             "sink" -> sink = maxOf(sink, category.score())
                             "toothbrush" -> toothbrush = maxOf(toothbrush, category.score())
@@ -117,5 +119,19 @@ class OnDeviceVisionEngine(context: Context) : VisionEngine {
     companion object {
         private const val INPUT_SIZE = 224
         private const val DETECTOR_SIZE = 320
+        private var loadedDetectorModel: ByteBuffer? = null
+
+        @Synchronized
+        private fun detectorModel(context: Context): ByteBuffer {
+            // A new MediaPipe graph must never rewrite a model file an older graph is reading.
+            val model = loadedDetectorModel ?: context.assets.open("efficientdet_lite0.tflite").use { asset ->
+                val bytes = asset.readBytes()
+                ByteBuffer.allocateDirect(bytes.size).apply {
+                    put(bytes)
+                    flip()
+                }.also { loadedDetectorModel = it }
+            }
+            return model.asReadOnlyBuffer()
+        }
     }
 }

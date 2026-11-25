@@ -37,7 +37,6 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -56,9 +55,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -68,6 +69,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.mikuwwl.wakeguard.R
 import com.mikuwwl.wakeguard.domain.VerificationAttempt
 import com.mikuwwl.wakeguard.domain.VisionFrame
 import com.mikuwwl.wakeguard.domain.VisionThresholds
@@ -172,7 +174,7 @@ fun CameraVerificationScreen(
         if (!hasPermission) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    androidx.compose.material3.Icon(Icons.Default.CameraAlt, null, tint = Color.White)
+                    androidx.compose.material3.Icon(painterResource(R.drawable.ic_camera), null, tint = Color.White)
                     Spacer(Modifier.height(12.dp))
                     Text("需要相机权限进行现场识别", color = Color.White)
                     Spacer(Modifier.height(12.dp))
@@ -184,11 +186,16 @@ fun CameraVerificationScreen(
                 }
             }
         } else {
-            val previewView = remember(context) { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER } }
+            val previewView = remember(context) {
+                PreviewView(context).apply {
+                    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                    scaleType = PreviewView.ScaleType.FIT_CENTER
+                }
+            }
             var previewSize by remember { mutableStateOf(IntSize.Zero) }
             AndroidView(
                 factory = { previewView },
-                modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp)
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp).clipToBounds()
                     .onSizeChanged { previewSize = it }.testTag("camera_preview"),
             )
             if (resumed && previewSize.width > 0 && previewSize.height > 0) {
@@ -235,11 +242,13 @@ fun CameraVerificationScreen(
                     VisionRow("洗手池", frame?.sink, thresholds.sink, "vision_sink")
                     VisionRow("牙刷", frame?.toothbrush, thresholds.toothbrush, "vision_toothbrush")
                     VisionRow("牙膏", frame?.toothpaste, thresholds.toothpaste, "vision_toothpaste")
-                    failure?.let { Text(it, color = Color(0xFFFFB4AB)) }
                     Text("已连续通过 $consecutive / 3 帧。", color = Color(0xFFB7C9C8), style = MaterialTheme.typography.bodySmall)
-                    if (frame != null && consecutive == 0 && failure == null) {
-                        Text("在光线充足处靠近洗手台，保持三个物品都在画面内。", color = Color(0xFFB7C9C8), style = MaterialTheme.typography.bodySmall)
-                    }
+                    Text(
+                        failure ?: "在光线充足处靠近洗手台，保持三个物品都在画面内。",
+                        color = if (failure == null) Color(0xFFB7C9C8) else Color(0xFFFFB4AB),
+                        minLines = 2,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                     OutlinedButton(
                         onClick = { resetAttempt(); failedAttemptsShown += 1; onRecordFailedAttempt() },
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
@@ -302,7 +311,7 @@ private fun CameraAnalysis(
             try {
                 cameraProvider = providerFuture.get()
                 val viewPort = ViewPort.Builder(Rational(size.width, size.height), rotation)
-                    .setScaleType(ViewPort.FILL_CENTER).build()
+                    .setScaleType(ViewPort.FIT).build()
                 val useCases = UseCaseGroup.Builder().setViewPort(viewPort)
                     .addUseCase(preview).addUseCase(analysis).build()
                 analysis.setAnalyzer(executor, analyzer)
@@ -313,11 +322,14 @@ private fun CameraAnalysis(
         }, ContextCompat.getMainExecutor(context))
         onDispose {
             accepting.set(false)
-            analysis.clearAnalyzer()
-            cameraProvider?.unbind(preview, analysis)
-            executor.execute { analyzer.close() }
-            executor.shutdown()
-            onStopped()
+            try {
+                analysis.clearAnalyzer()
+                cameraProvider?.unbind(preview, analysis)
+            } finally {
+                executor.execute { analyzer.close() }
+                executor.shutdown()
+                onStopped()
+            }
         }
     }
 }

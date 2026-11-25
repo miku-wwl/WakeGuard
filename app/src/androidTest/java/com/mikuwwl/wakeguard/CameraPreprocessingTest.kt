@@ -1,17 +1,26 @@
 package com.mikuwwl.wakeguard
 
+import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Rect
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.core.app.ApplicationProvider
+import com.mikuwwl.wakeguard.vision.OnDeviceVisionEngine
 import com.mikuwwl.wakeguard.vision.detectorTiles
 import com.mikuwwl.wakeguard.vision.letterbox
 import com.mikuwwl.wakeguard.vision.normalizedRgb
 import com.mikuwwl.wakeguard.vision.productCrop
 import com.mikuwwl.wakeguard.vision.rgbaBitmap
 import java.nio.ByteBuffer
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -59,6 +68,32 @@ class CameraPreprocessingTest {
             product.recycle()
             full.recycle()
             source.recycle()
+        }
+    }
+
+    @Test fun overlappingModelSessionsReadTheSameImmutableModel() {
+        val app = ApplicationProvider.getApplicationContext<Context>()
+        val assets = InstrumentationRegistry.getInstrumentation().context.assets
+        val picture = assets.open("vision/washingtoothbrush.jpg").use {
+            checkNotNull(BitmapFactory.decodeStream(it))
+        }
+        val active = CountDownLatch(1)
+        val worker = Executors.newSingleThreadExecutor()
+        try {
+            val first = worker.submit {
+                OnDeviceVisionEngine(app).use { engine ->
+                    active.countDown()
+                    repeat(5) { assertTrue(engine.analyze(picture).allScoresValid()) }
+                }
+            }
+            assertTrue(active.await(20, TimeUnit.SECONDS))
+            OnDeviceVisionEngine(app).use { engine ->
+                repeat(3) { assertTrue(engine.analyze(picture).allScoresValid()) }
+            }
+            first.get(30, TimeUnit.SECONDS)
+        } finally {
+            worker.shutdown()
+            if (worker.awaitTermination(30, TimeUnit.SECONDS)) picture.recycle()
         }
     }
 }

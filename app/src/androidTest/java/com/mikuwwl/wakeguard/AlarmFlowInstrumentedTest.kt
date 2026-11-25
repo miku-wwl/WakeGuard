@@ -45,6 +45,10 @@ class AlarmFlowInstrumentedTest {
         val alarms = database.alarmDao().getEnabled()
         assertEquals(1, alarms.size)
         assertEquals(127, alarms.single().repeatMask)
+        composeRule.onNodeWithTag("alarm_enabled").performClick()
+        composeRule.waitUntil(10_000) { runBlocking { database.alarmDao().getEnabled().isEmpty() } }
+        composeRule.onNodeWithTag("alarm_enabled").performClick()
+        composeRule.waitUntil(10_000) { runBlocking { database.alarmDao().getEnabled().size == 1 } }
     }
 
     @Test fun userCanEditAndDeleteAnAlarm() = runBlocking {
@@ -95,6 +99,7 @@ class AlarmFlowInstrumentedTest {
     @Test fun verificationAndEmergencyOutcomesAreIdempotent() = runBlocking {
         val dao = database.wakeEventDao()
         val verifiedId = dao.insert(WakeEventEntity(alarmId = 101, triggeredAt = 1_000, outcome = WakeOutcome.RINGING))
+        assertEquals(0, dao.finishVerified(verifiedId, 1_500))
         assertEquals(1, dao.startVerification(verifiedId, 2_000))
         assertEquals(1, dao.finishVerified(verifiedId, 3_000))
         assertEquals(0, dao.finishVerified(verifiedId, 4_000))

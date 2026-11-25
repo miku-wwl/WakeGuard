@@ -1,6 +1,7 @@
 package com.mikuwwl.wakeguard.data
 
 import androidx.room.Entity
+import androidx.room.ColumnInfo
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
@@ -13,6 +14,8 @@ data class WakeEventEntity(
     val finishedAt: Long? = null,
     val outcome: String,
     val failedAttempts: Int = 0,
+    val ringtoneUri: String? = null,
+    @ColumnInfo(defaultValue = "0") val vibration: Boolean = false,
 )
 
 object WakeOutcome {
@@ -21,4 +24,6 @@ object WakeOutcome {
     const val VERIFIED = "VERIFIED"
     const val EMERGENCY_STOP = "EMERGENCY_STOP"
     const val INTERRUPTED = "INTERRUPTED"
+    const val MISSED = "MISSED"
+    const val FAILED = "FAILED"
 }

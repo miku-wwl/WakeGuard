@@ -33,10 +33,10 @@ interface WakeEventDao {
     @Query("SELECT * FROM wake_events WHERE id = :id")
     suspend fun getById(id: Long): WakeEventEntity?
 
-    @Query("SELECT * FROM wake_events WHERE outcome IN ('RINGING', 'VERIFYING') ORDER BY triggeredAt LIMIT 1")
+    @Query("SELECT * FROM wake_events WHERE outcome IN ('RINGING', 'VERIFYING') ORDER BY triggeredAt, id LIMIT 1")
     fun observeActive(): Flow<WakeEventEntity?>
 
-    @Query("SELECT * FROM wake_events WHERE outcome IN ('RINGING', 'VERIFYING') ORDER BY triggeredAt LIMIT 1")
+    @Query("SELECT * FROM wake_events WHERE outcome IN ('RINGING', 'VERIFYING') ORDER BY triggeredAt, id LIMIT 1")
     suspend fun getActive(): WakeEventEntity?
 
     @Query("SELECT * FROM wake_events ORDER BY triggeredAt DESC LIMIT 100")
@@ -51,11 +51,14 @@ interface WakeEventDao {
     @Query("UPDATE wake_events SET failedAttempts = failedAttempts + 1 WHERE id = :id AND outcome IN ('RINGING', 'VERIFYING')")
     suspend fun recordFailedAttempt(id: Long): Int
 
-    @Query("UPDATE wake_events SET outcome = 'VERIFIED', finishedAt = :now WHERE id = :id AND outcome IN ('RINGING', 'VERIFYING')")
+    @Query("UPDATE wake_events SET outcome = 'VERIFIED', finishedAt = :now WHERE id = :id AND outcome = 'VERIFYING'")
     suspend fun finishVerified(id: Long, now: Long): Int
 
     @Query("UPDATE wake_events SET outcome = 'EMERGENCY_STOP', finishedAt = :now WHERE id = :id AND outcome IN ('RINGING', 'VERIFYING')")
     suspend fun finishEmergency(id: Long, now: Long): Int
+
+    @Query("UPDATE wake_events SET outcome = 'FAILED', finishedAt = :now WHERE id = :id AND outcome IN ('RINGING', 'VERIFYING')")
+    suspend fun failActive(id: Long, now: Long): Int
 
     @Query("UPDATE wake_events SET outcome = 'INTERRUPTED', finishedAt = :now WHERE outcome IN ('RINGING', 'VERIFYING')")
     suspend fun interruptActive(now: Long): Int
