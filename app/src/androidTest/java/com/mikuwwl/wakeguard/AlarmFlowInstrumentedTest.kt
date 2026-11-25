@@ -79,24 +79,29 @@ class AlarmFlowInstrumentedTest {
         composeRule.onNodeWithTag("add_alarm").performClick()
         composeRule.onNodeWithTag("alarm_label").performTextReplacement("Morning test")
         composeRule.onNodeWithTag("save_alarm").performClick()
-        composeRule.waitUntil(10_000) {
-            composeRule.onAllNodesWithText("Morning test").fetchSemanticsNodes().isNotEmpty()
-        }
+        // The editor's text field also exposes its current value as text. Wait for
+        // the alarm list itself so this cannot pass before save navigates home.
+        waitForAlarmCard("Morning test")
 
-        composeRule.onNodeWithTag("edit_alarm").performClick()
+        composeRule.onNodeWithTag("edit_alarm").performScrollTo().assertIsDisplayed().performClick()
         composeRule.onNodeWithTag("alarm_label").performTextReplacement("Edited morning test")
         composeRule.onNodeWithTag("save_alarm").performClick()
-        composeRule.waitUntil(10_000) {
-            composeRule.onAllNodesWithText("Edited morning test").fetchSemanticsNodes().isNotEmpty()
-        }
+        waitForAlarmCard("Edited morning test")
         assertEquals("Edited morning test", database.alarmDao().getEnabled().single().label)
 
-        composeRule.onNodeWithTag("delete_alarm").performClick()
+        composeRule.onNodeWithTag("delete_alarm").performScrollTo().assertIsDisplayed().performClick()
         composeRule.onNodeWithText("删除").performClick()
         composeRule.waitUntil(10_000) {
             composeRule.onAllNodesWithText("还没有闹钟").fetchSemanticsNodes().isNotEmpty()
         }
         assertTrue(database.alarmDao().getEnabled().isEmpty())
+    }
+
+    private fun waitForAlarmCard(label: String) {
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithTag("alarm_list").fetchSemanticsNodes().isNotEmpty() &&
+                composeRule.onAllNodesWithText(label).fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     @Test fun activeAlarmCanEnterLiveCameraVerification() {
