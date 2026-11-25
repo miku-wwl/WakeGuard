@@ -2,7 +2,6 @@ package com.mikuwwl.wakeguard.vision
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Rect
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
@@ -31,104 +30,92 @@ class OnDeviceVisionEngine(context: Context) : VisionEngine {
         val detectorOptions = ObjectDetectorOptions.builder()
             .setBaseOptions(BaseOptions.builder().setModelAssetPath("efficientdet_lite0.tflite").build())
             .setRunningMode(RunningMode.IMAGE)
-            .setMaxResults(20)
+            .setMaxResults(10)
+            .setCategoryAllowlist(listOf("sink", "toothbrush"))
             .setScoreThreshold(0.25f)
             .build()
         detector = ObjectDetector.createFromOptions(appContext, detectorOptions)
-        val model = appContext.assets.open("toothpaste_classifier.onnx").use { it.readBytes() }
-        session = environment.createSession(model, OrtSession.SessionOptions())
+        try {
+            val model = appContext.assets.open("toothpaste_classifier.onnx").use { it.readBytes() }
+            session = OrtSession.SessionOptions().use { options ->
+                options.setIntraOpNumThreads(2)
+                environment.createSession(model, options)
+            }
+        } catch (error: Exception) {
+            detector.close()
+            throw error
+        }
         inputName = session.inputNames.first()
     }
 
     override fun analyze(bitmap: Bitmap): VisionFrame {
-        val crops = candidateCrops(bitmap)
         var sink = 0f
         var toothbrush = 0f
-        try {
-            // Keep full-scene context, then scan the centered zoom where small items such as a toothbrush
-            // are easier to recognize. Scores are still tied to objects in this same live camera frame.
-            listOf(bitmap, crops.first()).forEach { input ->
-                val detections = detector.detect(BitmapImageBuilder(input).build()).detections()
-                for (detection in detections) {
+        fun detect(input: Bitmap) {
+            val image = BitmapImageBuilder(input).build()
+            try {
+                for (detection in detector.detect(image).detections()) {
                     for (category in detection.categories()) {
-                        when (category.categoryName().trim().lowercase()) {
+                        when (category.categoryName()) {
                             "sink" -> sink = maxOf(sink, category.score())
                             "toothbrush" -> toothbrush = maxOf(toothbrush, category.score())
                         }
                     }
                 }
+            } finally {
+                image.close()
             }
-            var toothpaste = 0f
-            crops.forEach { crop -> toothpaste = maxOf(toothpaste, classifyToothpaste(crop)) }
-            return VisionFrame(sink = sink, toothbrush = toothbrush, toothpaste = toothpaste)
+        }
+        val entireView = letterbox(bitmap, DETECTOR_SIZE)
+        try {
+            detect(entireView)
         } finally {
-            crops.forEach { crop -> if (crop !== bitmap && !crop.isRecycled) crop.recycle() }
+            entireView.recycle()
         }
-    }
-
-    private fun candidateCrops(bitmap: Bitmap): List<Bitmap> {
-        val width = bitmap.width
-        val height = bitmap.height
-        val cropWidth = (width * 0.62f).toInt().coerceAtLeast(1)
-        val cropHeight = (height * 0.62f).toInt().coerceAtLeast(1)
-        val positions = listOf(
-            Rect(0, 0, width, height),
-            Rect(0, 0, cropWidth, cropHeight),
-            Rect(width - cropWidth, 0, width, cropHeight),
-            Rect(0, height - cropHeight, cropWidth, height),
-            Rect(width - cropWidth, height - cropHeight, width, height),
-        )
-        return positions.map { rect ->
-            val side = minOf(rect.width(), rect.height())
-            val left = rect.left + (rect.width() - side) / 2
-            val top = rect.top + (rect.height() - side) / 2
-            Bitmap.createBitmap(bitmap, left, top, side, side)
+        for (tile in detectorTiles(bitmap.width, bitmap.height)) {
+            val crop = productCrop(bitmap, tile, DETECTOR_SIZE)
+            try {
+                detect(crop)
+            } finally {
+                crop.recycle()
+            }
         }
+        var toothpaste = 0f
+        for (region in productCropRegions(bitmap.width, bitmap.height)) {
+            val crop = productCrop(bitmap, region, INPUT_SIZE)
+            try {
+                toothpaste = maxOf(toothpaste, classifyToothpaste(crop))
+            } finally {
+                crop.recycle()
+            }
+        }
+        return VisionFrame(sink, toothbrush, toothpaste)
     }
 
     private fun classifyToothpaste(bitmap: Bitmap): Float {
-        val input = FloatArray(3 * INPUT_SIZE * INPUT_SIZE)
-        val scaled = Bitmap.createScaledBitmap(bitmap, INPUT_SIZE, INPUT_SIZE, true)
-        try {
-            var pixelIndex = 0
-            for (channel in 0..2) {
-                val mean = MEAN[channel]
-                val std = STD[channel]
-                for (y in 0 until INPUT_SIZE) {
-                    for (x in 0 until INPUT_SIZE) {
-                        val pixel = scaled.getPixel(x, y)
-                        val value = when (channel) {
-                            0 -> (pixel shr 16) and 0xff
-                            1 -> (pixel shr 8) and 0xff
-                            else -> pixel and 0xff
-                        } / 255f
-                        input[pixelIndex++] = (value - mean) / std
-                    }
-                }
+        val input = normalizedRgb(bitmap)
+        val shape = longArrayOf(1, 3, INPUT_SIZE.toLong(), INPUT_SIZE.toLong())
+        return OnnxTensor.createTensor(environment, FloatBuffer.wrap(input), shape).use { tensor ->
+            session.run(mapOf(inputName to tensor)).use { result ->
+                val logits = (result[0].value as Array<*>).single() as FloatArray
+                check(logits.size == 28 && logits.all(Float::isFinite)) { "Invalid classifier output" }
+                val peak = logits.max()
+                val probabilities = logits.map { exp((it - peak).toDouble()) }
+                ((probabilities[20] + probabilities[21]) / probabilities.sum()).toFloat()
             }
-            val tensor = OnnxTensor.createTensor(environment, FloatBuffer.wrap(input), longArrayOf(1, 3, INPUT_SIZE.toLong(), INPUT_SIZE.toLong()))
-            return tensor.use { value ->
-                session.run(mapOf(inputName to value)).use { result ->
-                    val logits = ((result[0].value as? Array<*>)?.firstOrNull() as? FloatArray) ?: return@use 0f
-                    val peak = logits.maxOrNull() ?: return@use 0f
-                    val probabilities = logits.map { exp((it - peak).toDouble()) }
-                    val denominator = probabilities.sum()
-                    ((probabilities[20] + probabilities[21]) / denominator).toFloat()
-                }
-            }
-        } finally {
-            if (scaled !== bitmap) scaled.recycle()
         }
     }
 
     override fun close() {
-        detector.close()
-        session.close()
+        try {
+            detector.close()
+        } finally {
+            session.close()
+        }
     }
 
     companion object {
         private const val INPUT_SIZE = 224
-        private val MEAN = floatArrayOf(0.485f, 0.456f, 0.406f)
-        private val STD = floatArrayOf(0.229f, 0.224f, 0.225f)
+        private const val DETECTOR_SIZE = 320
     }
 }
