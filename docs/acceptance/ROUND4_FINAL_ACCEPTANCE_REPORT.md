@@ -4,7 +4,7 @@ Date: 2026-11-25 (Pacific/Auckland)
 
 ## 1. Executive summary
 
-**Verdict: BLOCKED — PHYSICAL ACCEPTANCE UNAVAILABLE.** Round 4 implements Android-compliant service and state-reconciliation changes, bounded local lifecycle diagnostics, and an explicit user-resume path. Round 4B adds user-initiated sanitized diagnostic export and a Chinese physical-test guide. JVM, lint, build, API 36 functional instrumentation, and the production-model fixture gate passed. Corrected local evidence confirmed future-alarm delivery after task removal and one active-alarm task removal with playback retained. Repeated active removals were inconsistent: the second local attempt and first CI attempt left the task present. The owner-reported iQOO Neo9 Pro behavior remains unverified. An alpha.4-rc.1 experimental manual-test prerelease is being prepared; final alpha.4 remains blocked.
+**Verdict: PARTIAL — READY FOR MANUAL PHYSICAL DEVICE TESTING.** Round 4B adds user-initiated sanitized diagnostic export and a Chinese physical-test guide. Local JVM (20/20), lint, APK builds, API 36 functional instrumentation (26/26), and production-model acceptance (1/1) passed. CI run 45604309140 passed its build, functional, and model steps but failed closed because neither ADB-generated Recents gesture removed the task card; the strict `real-vision-gate` remains failed. The owner-authorized `v0.1.0-alpha.4-rc.1` prerelease is published for manual testing. Physical iQOO/OriginOS behavior remains **NOT TESTED**, the reported root cause remains **NOT CONFIRMED**, and final alpha.4 remains blocked.
 
 ## 2. Owner-reported physical defect
 
@@ -34,8 +34,9 @@ The only attached test target was the existing API 36 x86_64 `WakeGuard_API36` A
 
 - Playback resources are event-scoped and owned by `AlarmForegroundService`, not the Activity.
 - The prior manifest relied on the Android default for `stopWithTask`; omission alone did not establish the physical failure cause.
-- In the latest CI rerun (45585131166), TC01 removed task ID 36 and the one-time alarm later delivered with playback. Android closed Recents after its final card disappeared; the corrected harness accepts this when the exact task ID and card are absent.
+- In the Round 4 baseline CI rerun (45585131166), TC01 removed task ID 36 and the one-time alarm later delivered with playback. Android closed Recents after its final card disappeared; the corrected harness accepts this when the exact task ID and card are absent.
 - In that CI run's TC02, the ADB-generated upward gesture did not remove task ID 37 or its Recents card. The same `RINGING` event, foreground service and MediaPlayer stayed active. This is not evidence of playback after an actual active-task removal.
+- In Round 4B CI run [45604309140](https://github.com/miku-wwl/WakeGuard/actions/runs/45604309140), the TC01 gesture also left task ID 36 and its card present, although the future alarm later delivered. The first TC02 gesture left its card present; event 2 remained `RINGING`, with its foreground service and MediaPlayer active. The harness then completed `EMERGENCY_STOP`, `verified_count=0`, and no service remained. Neither gesture proves active-task removal behavior.
 - In a corrected local TC02 rerun, the first active swipe removed task ID 225; event 11, its foreground service and MediaPlayer remained active. After reopening the app, a second swipe left task ID 226 present and the same event remained active. The run stopped there and emergency cleanup completed.
 - A separate idle-state smoke swipe removed a task from Recents, but this does not reproduce task removal with an alarm scheduled or active.
 - Ordinary sticky recovery and same-event state checks passed in the scheduled AVD flow before its live camera scene failed to qualify.
@@ -61,7 +62,7 @@ No OEM switch was changed or required by emulator acceptance. On the iQOO, first
 
 ## 10. Before/after device behavior
 
-There is no physical before/after comparison. CI run 45585131166 confirmed that a future-alarm swipe removed task ID 36 and the one-time alarm later delivered with playback. In its active-alarm scenario, the ADB gesture left task ID 37 and its card present; the same event, foreground service and MediaPlayer remained active. A corrected local run removed active task ID 225 once with playback retained, but a later swipe left reopened task ID 226 present. No physical active-alarm result exists, so the reported iQOO defect remains open.
+There is no physical before/after comparison. CI run 45585131166 confirmed that one future-alarm swipe removed task ID 36 and the one-time alarm later delivered with playback. The later Round 4B run 45604309140 did not remove the TC01 task/card, although its alarm delivered; in TC02 the active task/card also remained while the same event, foreground service and MediaPlayer stayed active. A corrected local run removed active task ID 225 once with playback retained, but a later swipe left reopened task ID 226 present. No physical active-alarm result exists, so the reported iQOO defect remains open.
 
 ## 11. Automated regression
 
@@ -74,7 +75,7 @@ There is no physical before/after comparison. CI run 45585131166 confirmed that 
 - Scheduled full CameraX flow with task removal and ordinary process recovery: **PARTIAL**. Earlier lifecycle steps passed, but the AVD's selected live scene did not qualify within 35 seconds; emergency cleanup passed.
 - A Round 4 camera-screen-off rerun did not observe `Asleep` after its AVD key events. Round 3 has separate prior AVD screen-off evidence; neither result establishes physical screen-off behavior.
 
-Round 4B bounded local verification added a formatter privacy test and instrumented export/share checks. Results: JVM **20/20 PASS**; lint **0 errors, 34 warnings, 4 hints**; debug and test APK builds **PASS**; API 36 functional instrumentation **26/26 PASS**; production-model acceptance **1/1 PASS**. The export test verified app-private cache output, scoped read-only URI sharing, event/service state preservation, and redaction. The separate Round 4 strict Recents gate was not rerun.
+Round 4B bounded local verification added a formatter privacy test and instrumented export/share checks. Results: JVM **20/20 PASS**; lint **0 errors, 34 warnings, 4 hints**; debug and test APK builds **PASS**; API 36 functional instrumentation **26/26 PASS**; production-model acceptance **1/1 PASS**. The export test verified app-private cache output, scoped read-only URI sharing, event/service state preservation, and redaction. CI run 45604309140 also passed 26/26 functional tests and 1/1 production-model test, but the Recents harness was partial and the strict gate failed closed; see Section 14 and the [Round 4B delivery record](ROUND4B_EXPERIMENTAL_DELIVERY.md).
 
 See [ROUND4_TEST_MATRIX.md](ROUND4_TEST_MATRIX.md) and local raw evidence under `D:\workshop\nov\reports\round4`.
 
@@ -90,13 +91,15 @@ The app retains the explicit confirmation-gated emergency stop. Local AVD and in
 
 Run [45585131166](https://github.com/miku-wwl/WakeGuard/actions/runs/45585131166) tested source SHA `deee9fc5b044b2cd49d1864438651d9ebed29233`. The first emulator attempt hit a transient Gradle plugin-resolution failure; the failed jobs were rerun. On rerun, `verify` passed JVM tests, lint, dual-ABI APK builds, checksums and signature verification; all 25 API 36 functional instrumentation tests passed; the lightweight production-model gate passed at 4/6 positives, 1/2 independent positives and 0/5 obvious unrelated scenes; the historical strict diagnostic passed. TC01 task ID 36 and card disappeared and the one-time alarm later delivered with playback. TC02 did not remove task ID 37 or its card, while the same event, foreground service and MediaPlayer stayed active. Therefore the emulator job and fail-closed `real-vision-gate` failed. Safety cleanup stopped event 2 as `EMERGENCY_STOP`, left `verified_count=0`, and removed the foreground service. The corrected local run did remove active task ID 225 once with the same event and playback preserved, but its next swipe left task ID 226 present. Full CI evidence is in `D:\workshop\nov\reports\round4\ci-45585131166-final`; physical iQOO remains separate and untested.
 
+Round 4B source CI [45604309140](https://github.com/miku-wwl/WakeGuard/actions/runs/45604309140) tested commit `964b1ffd37693a7af88f84f8e816a1485dcafddd`. The `verify` job passed JVM tests, lint, dual-ABI builds and checksums; API 36 functional instrumentation passed 26/26 and production-model acceptance passed 1/1. The Recents harness did not actually remove the task/card in either TC01 or TC02. TC01's future alarm still delivered while its card remained. For TC02, event 2 remained `RINGING`, with foreground service and MediaPlayer active; emergency cleanup completed as `EMERGENCY_STOP`, `verified_count=0`, with no service remaining. The emulator job and strict `real-vision-gate` failed, so the overall workflow is **FAIL / fail-closed**. This is not evidence of playback after active-task removal. The workflow artifact was downloaded to `D:\workshop\nov\releases\round4b\ci-evidence` and is not part of the public release.
+
 ## 15. Acceptance matrix
 
 See [ROUND4_TEST_MATRIX.md](ROUND4_TEST_MATRIX.md). The critical physical swipe-removal criteria remain blocked or untested regardless of the emulator score.
 
 ## 16. APK and signing evidence
 
-Local experimental artifacts were created under `D:\workshop\nov\releases\round4`. Both ABIs report versionCode 4, versionName `0.1.0-alpha.4`, target SDK 36 and pass APK v2 signature verification. The alpha.4 certificate SHA-256 matches both locally available alpha.3 APKs (`d5e7e8aa3565c2ba8870b98cdafdb5d82aa392190d58710455e1ba7934106658`), so debug-signature install/update compatibility is verified for these artifacts. SHA-256 values are in the local `SHA256SUMS.txt`. ARM64 runtime on a physical device is not verified.
+The owner-authorized experimental release [v0.1.0-alpha.4-rc.1](https://github.com/miku-wwl/WakeGuard/releases/tag/v0.1.0-alpha.4-rc.1) is published from source commit `964b1ffd37693a7af88f84f8e816a1485dcafddd`. Both ABIs report versionCode 4, versionName `0.1.0-alpha.4-rc.1`, target SDK 36 and valid APK v2 signatures. The certificate SHA-256 (`d5e7e8aa3565c2ba8870b98cdafdb5d82aa392190d58710455e1ba7934106658`) matches both downloaded alpha.3 APKs; installation over alpha.3 without uninstalling or clearing app data is supported. ARM64 runtime on a physical device is not verified. ARM64 APK SHA-256: `397c0f462dd9b8e396b9258fc92150230b3d1e413df5b56cf95b3d022fa541c1`; x86_64 APK SHA-256: `04b085dfe8ce1e0caf5e0d69834f6f6e175e8375a68994706dcf69fbc2c512bc`.
 
 ## 17. Known limitations
 
@@ -104,8 +107,8 @@ Physical acceptance and OriginOS settings remain unavailable. `START_STICKY` is 
 
 ## 18. Final commit and release status
 
-Product implementation commit: `8d5d92d101d0a9c8ed35c579d90a1b28473b0080`. Strict harness and evidence correction commits: `03393692ecafe3f35c37c5d15113028dafab53ef` and `9b3f8099c3f91bf8ebe057668d93f1b6fdf86350`. Instrumentation synchronization fix: `deee9fc5b044b2cd49d1864438651d9ebed29233`. Round 4B is preparing the separately named `v0.1.0-alpha.4-rc.1` experimental prerelease under the owner's manual-testing authorization; it does not claim physical acceptance or a green strict Recents gate. Final `v0.1.0-alpha.4` remains blocked until physical acceptance reaches `PASS_NATIVE` or `PASS_WITH_OEM_CONFIGURATION` and all other mandatory gates pass. See [ROUND4B_EXPERIMENTAL_DELIVERY.md](ROUND4B_EXPERIMENTAL_DELIVERY.md) for the final delivery record.
+Product implementation commit: `8d5d92d101d0a9c8ed35c579d90a1b28473b0080`. Strict harness and evidence correction commits: `03393692ecafe3f35c37c5d15113028dafab53ef` and `9b3f8099c3f91bf8ebe057668d93f1b6fdf86350`. Instrumentation synchronization fix: `deee9fc5b044b2cd49d1864438651d9ebed29233`. Round 4B source commit: `964b1ffd37693a7af88f84f8e816a1485dcafddd`; the experimental `v0.1.0-alpha.4-rc.1` release tag targets that commit. It does not claim physical acceptance or a green strict Recents gate. Final `v0.1.0-alpha.4` remains blocked until physical acceptance reaches `PASS_NATIVE` or `PASS_WITH_OEM_CONFIGURATION` and all other mandatory gates pass. See [ROUND4B_EXPERIMENTAL_DELIVERY.md](ROUND4B_EXPERIMENTAL_DELIVERY.md) for the delivery record.
 
 ## 19. Final verdict
 
-**BLOCKED — PHYSICAL ACCEPTANCE UNAVAILABLE.**
+**PARTIAL — READY FOR MANUAL PHYSICAL DEVICE TESTING.** Physical acceptance and final alpha.4 publication remain blocked; the experimental RC exists only to support the owner's manual test.
