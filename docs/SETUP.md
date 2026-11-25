@@ -1,38 +1,21 @@
 # Windows setup
 
-The verified local installation used for this project is under `D:\workshop\nov`:
-
-- Android Studio Stable 2026.2.2 Patch 2 and bundled JDK 25.0.4.
-- Android SDK API 36, Build Tools 36.0.0, Platform Tools 37.0.3, Emulator 37.3.10.
-- Pixel 7 profile AVD `WakeGuard_API36`, Google APIs x86_64, Android 16, 4 GB guest RAM.
-- Gradle Wrapper 9.9.2 with the official distribution SHA-256 pinned in `gradle/wrapper/gradle-wrapper.properties`.
-- `ANDROID_HOME`, `ANDROID_AVD_HOME`, `ANDROID_USER_HOME`, `GRADLE_USER_HOME`, Java, and temporary paths are set for the current PowerShell process by `scripts\set-local-environment.ps1`. Global Windows environment values are not changed.
-
-## Build
+Round 2 reused the D-drive toolchain. The Android Studio 2026.2.2 Patch 2 installation provides JDK 25.0.4. The SDK contains API 36, Build Tools 36.0.0, ADB 37.0.3 and Emulator 37.3.10. The repository pins Gradle 9.9.2 and its distribution digest.
 
 ```powershell
 . '.\scripts\set-local-environment.ps1'
-.\gradlew.bat --version
-.\gradlew.bat assembleDebug
-.\gradlew.bat testDebugUnitTest
-.\gradlew.bat lintDebug
+.\scripts\start-emulator.ps1
+.\gradlew.bat assembleDebug assembleDebugAndroidTest
+adb -s emulator-5554 install -r app\build\outputs\apk\debug\app-x86_64-debug.apk
 ```
 
-## Emulator
+The environment script keeps tool, SDK, AVD, Gradle and subprocess temp paths scoped to the project shell. The Pixel 7 AVD uses the API 36 Google APIs x86_64 system image with WHPX, four virtual CPUs and 4 GB guest RAM. Use `-Window` to show it.
+
+The emulator camera can use a licensed image from the D-drive workspace. Changing its input requires stopping and starting the AVD. Use a fresh evidence directory for each run.
 
 ```powershell
-D:\workshop\nov\WakeGuard\scripts\start-emulator.ps1
-.\gradlew.bat connectedDebugAndroidTest
-D:\workshop\nov\WakeGuard\scripts\stop-emulator.ps1
+.\scripts\stop-emulator.ps1
+.\scripts\start-emulator.ps1 -CameraImage 'D:\workshop\nov\cache\vision-data\round2\commons\wm-119921527.jpg' -EvidenceDirectory 'D:\workshop\nov\reports\round2\verification-run'
 ```
 
-The emulator uses WHPX. Use `-Window` with the start script if visual interaction is needed. AVD disk images, SDK packages, Gradle cache, and downloads remain on D:. Emulator evidence cannot verify physical speaker output, OEM battery policies, or a physical camera.
-
-## Install manually
-
-```powershell
-adb install -r app\build\outputs\apk\debug\app-debug.apk
-adb shell monkey -p com.mikuwwl.wakeguard 1
-```
-
-The first alarm will require Android's exact-alarm access. Notification permission is needed on Android 13+, full-screen access may be separately gated on Android 14+, and camera permission is requested when verification opens.
+Use `-NoBackCamera` to exercise the unavailable-camera path. Grant exact-alarm, notification and full-screen access before a scheduled test. The project tests Android on the emulator. Model research uses the existing CPU Python environment in `D:\workshop\nov\tools\vision-venv`.

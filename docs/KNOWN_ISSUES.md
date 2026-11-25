@@ -1,9 +1,7 @@
 # Known issues
 
-- The custom toothpaste classifier's source data is product imagery, not a bathroom-scene detection dataset. Its held-out classification metrics cannot establish accuracy in real camera scenes. Natural-scene performance must be evaluated before calling verification production-ready.
-- The classifier treats only the two MIMEX labels `sensodyne_toothpaste` and `colgate_toothpaste` as toothpaste. Other brands, unboxed tubes, applied paste, and partially occluded products are not established as detectable.
-- EfficientDet-Lite0 only labels the COCO classes, which do not include toothpaste. A separately trained product classifier is required.
-- Real-time inference scans five image crops at a limited frame rate. Older or low-memory devices may have noticeable latency.
-- Exact alarms, notifications, and full-screen launches require Android-granted access. Settings can be reopened to recover.
-- The repository has no release signing key. The alpha APK is debug-signed.
-- Emulator testing cannot validate physical camera, audio hardware, OEM battery policies, or all lock-screen implementations.
+- The local models still miss complete bathroom scenes. Round 2 has two independently grouped holdout positives. Wider variation in rooms, brands, lighting and placement is required for an alpha verdict.
+- EfficientDet's COCO sink label includes sinks outside bathrooms. The toothpaste classifier estimates two MIMEX toothpaste product labels and does not localize a tube. Cosmetics and partially occluded items remain difficult.
+- Local alternatives were compared. SSDlite and OmDet-Turbo missed both holdout positives. OmDet-Turbo accepted one incomplete scene. The bundled thresholds remain 0.45, 0.45 and 0.93.
+- Android can prevent exact delivery and full-screen presentation. A system interruption, missed overlap and playback failure each have distinct history outcomes.
+- The ARM64 build was produced for future testing. API 36 x86_64 is the tested emulator ABI. The experimental APKs use debug signing.

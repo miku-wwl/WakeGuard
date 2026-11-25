@@ -1,14 +1,21 @@
-# Build and release
+# Build and release gates
 
-The workflow in `.github/workflows/android.yml` runs unit tests, compiles Android instrumentation tests, runs Android lint, and builds a debug APK, then uploads the APK as a CI artifact. Instrumentation executes locally on the API 36 emulator.
-
-For local testing:
+Round 2 prepares local experimental APKs. Public GitHub Releases and Google Play are outside this round.
 
 ```powershell
 . '.\scripts\set-local-environment.ps1'
-.\gradlew.bat testDebugUnitTest lintDebug assembleDebug
-.\gradlew.bat connectedDebugAndroidTest
-Get-FileHash app\build\outputs\apk\debug\app-debug.apk -Algorithm SHA256
+.\gradlew.bat testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest
+Get-FileHash app\build\outputs\apk\debug\app-x86_64-debug.apk -Algorithm SHA256
+Get-FileHash app\build\outputs\apk\debug\app-arm64-v8a-debug.apk -Algorithm SHA256
 ```
 
-`v0.1.0-alpha.1` is a debug-signed prerelease, never a production-signed APK. Publish only after the alarm trigger, camera/inference, emergency stop, screen-off/background behavior, automated tests, lint, CI, and model/license evidence all pass. If a required gate is partial or blocked, keep the APK in the local `releases` directory and report the outstanding evidence. Attach the APK, its SHA-256 file, release notes, known limitations, and exact test status. Do not publish to Google Play.
+The debug APKs have version name `0.1.0-alpha.2` and version code 2. The x86_64 build is for the emulator. The ARM64 package is build- and signature-checked. Verify both with Android Build Tools `apksigner`. CI saves temporary build and test artifacts with SHA-256 checksums.
+
+The production model gate requires at least 90% of the four historical complete fixtures to pass three actual inferences and rejects both incomplete fixtures and invalid outputs. Failure makes the real-vision gate red. The historical gate is one condition for alpha acceptance. Independent acceptance also requires:
+
+- Functional alarm, camera and lifecycle tests with no critical unresolved defects.
+- At least 30 independently grouped complete and 30 incomplete real holdout scenes. Positive acceptance must be at least 90%. The negative set must cover each missing-object category with zero observed false accepts.
+- A genuine live CameraX flow that stops playback and records one verified Room event.
+- Reviewed model and dataset provenance, checksums, signing and acceptance evidence.
+
+Local output is under `D:\workshop\nov\releases\round2` and `D:\workshop\nov\reports\round2`.

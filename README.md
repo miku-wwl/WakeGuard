@@ -1,49 +1,34 @@
 # WakeGuard
 
-WakeGuard is an offline-first Android alarm prototype. It schedules exact alarm-clock events, keeps ringing through normal app backgrounding, and offers a live CameraX task intended to check for a sink, toothbrush, and toothpaste before recording a successful wake-up.
+WakeGuard is an offline Android alarm prototype written in Kotlin and Jetpack Compose. It schedules exact alarms, rings through ordinary backgrounding and uses live camera input to look for a bathroom sink, toothbrush and toothpaste. Wake history stays in Room on the device.
 
-The app is an alpha. Sink and toothbrush are recognized by Google's COCO-trained EfficientDet-Lite0 model. Toothpaste is classified by a small MobileNetV3-Small model trained locally from scratch on two toothpaste categories in the MIT-tagged MIMEX product dataset. Product-image metrics do not establish real bathroom-scene performance: **none of the four licensed complete bathroom scenes tested passed all three production thresholds**, so end-to-end camera verification remains unvalidated and the prerelease gate is closed. See [AI model notes](docs/AI_MODEL.md) for measured scores and limits.
+Round 2 is an **experimental build**. It adds event-scoped playback and recovery, persisted schedule registration, and a lifecycle-aware camera pipeline. The historical positive model gate still fails. The independent holdout contains two complete scenes, below the 30 required for alpha acceptance. See [model evaluation](docs/AI_MODEL.md) and [release criteria](docs/RELEASE.md).
 
-## Features
+## Use the app
 
-- One-time, daily, weekday, and custom weekday alarms stored in Room.
-- Exact `setAlarmClock()` scheduling, ringtone selection, vibration, and boot/timezone recovery.
-- Media playback foreground service, ongoing notification, and lock-screen full-screen entry when Android grants it.
-- CameraX live preview with on-device object detection and ONNX classification. Images stay in memory and are not saved.
-- Verification only succeeds after all three scores cross their configured thresholds for three consecutive frames.
-- Deliberate emergency stop records an unsuccessful outcome. Back does not dismiss an active task.
-- Local wake history, verification duration, emergency stops, and manually recorded failed attempts.
+1. Open **闹钟**, add a time, select repeat days and save. Leave all days unselected for a one-time alarm.
+2. Grant exact-alarm access from **设置**. Android provides notification and full-screen access separately. An enabled alarm with no registration shows **尚未排程**.
+3. During ringing, select **开始现场验证** and keep the three objects in view. The app requires three consecutive valid frames. **紧急停止** is available throughout the alarm and records an unverified outcome after confirmation.
 
-## Build and run
+Camera inference stays on the device. The app does not save camera frames.
 
-The verified Windows setup for this workspace is documented in [docs/SETUP.md](docs/SETUP.md). With Android SDK API 36 and Java 17 or newer configured:
+## Build and test
 
 ```powershell
 . '.\scripts\set-local-environment.ps1'
-.\gradlew.bat assembleDebug
-.\gradlew.bat testDebugUnitTest
-.\gradlew.bat connectedDebugAndroidTest
+.\scripts\start-emulator.ps1
+.\gradlew.bat testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest
+.\gradlew.bat connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.notAnnotation=androidx.test.filters.LargeTest'
 ```
 
-The debug APK is created at `app/build/outputs/apk/debug/app-debug.apk`. Exact-alarm, notification, full-screen-intent, and camera access must be granted by the user in Android settings or in the app's permission flow.
+Use the x86_64 APK for the provisioned emulator. The ARM64 artifact was built for future testing. See [Windows setup](docs/SETUP.md) and [test plan](docs/TEST_PLAN.md).
 
-## Emulator screenshots
+## Emulator evidence
 
-These screenshots were captured on the API 36 Android Emulator. The camera image is the emulator's synthetic virtual-camera feed; it scored sink 0%, toothbrush 0%, toothpaste 91% against thresholds 45%, 45%, and 93%, so it did not verify a wake-up.
+Round 2 reports and raw logs are under `D:\workshop\nov\reports\round2`. The [emulator screenshots](docs/screenshots) show the app in use. The alpha gate still requires a successful camera-to-dismissal recording with the bundled model.
 
-| App state | Screenshot |
-| --- | --- |
-| Alarm list | ![WakeGuard alarm list](docs/screenshots/home.png) |
-| Active alarm | ![WakeGuard active alarm](docs/screenshots/alarm.png) |
-| Live camera and model scores | ![WakeGuard camera preview](docs/screenshots/camera.png) |
-| Wake history after emergency stop and system interruption | ![WakeGuard statistics](docs/screenshots/stats.png) |
-
-Execution logs and the final acceptance report are kept outside Git under `D:\workshop\nov\reports`.
-
-## Platform limits
-
-Android may restrict exact alarms, full-screen notifications, background launches, and power behavior. An ordinary app cannot prevent force-stop, shutdown, reboot, or system-level volume controls. Emulator results do not validate physical camera or speaker hardware. See [Android limitations](docs/ANDROID_LIMITATIONS.md) and [known issues](docs/KNOWN_ISSUES.md).
+See [architecture](docs/ARCHITECTURE.md), [Android platform limits](docs/ANDROID_LIMITATIONS.md) and [known issues](docs/KNOWN_ISSUES.md).
 
 ## License
 
-WakeGuard source code is MIT licensed. Third-party software and model notices are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Source code is MIT licensed. Model, runtime and fixture provenance are in [Third-party notices](THIRD_PARTY_NOTICES.md).
