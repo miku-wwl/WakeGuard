@@ -174,16 +174,21 @@ def swipe_task(device: Device, prefix: str) -> bool:
         "removal_method": "ADB input swipe in Recents",
         "recents_visible_before": True,
         "recents_visible_after": recents_still_open,
+        "recents_closed_after_dismissal": not recents_still_open,
         "task_ids_before": task_ids_before,
         "task_ids_after": task_ids_after,
         "task_ids_absent_after": task_removed,
         "card_still_visible_after": card_still_visible,
     }
     (device.evidence / f"{prefix}-task-removal-state.json").write_text(json.dumps(state, indent=2), encoding="utf-8")
-    if not recents_still_open or not task_removed or card_still_visible:
+    # Android may close Recents after the last task card is dismissed. Task-ID
+    # disappearance plus card disappearance is the removal proof; requiring the
+    # Recents surface to remain open would reject a successful swipe.
+    if not task_removed or card_still_visible:
         return False
-    device.press(3)  # KEYCODE_HOME; leave Recents only after the card is gone.
-    time.sleep(0.8)
+    if recents_still_open:
+        device.press(3)  # KEYCODE_HOME; leave Recents only after the card is gone.
+        time.sleep(0.8)
     return True
 
 

@@ -4,7 +4,7 @@ Date: 2026-11-25 (Pacific/Auckland)
 
 ## 1. Executive summary
 
-**Verdict: BLOCKED — PHYSICAL ACCEPTANCE UNAVAILABLE.** Round 4 implements Android-compliant service and state-reconciliation changes, bounded local lifecycle diagnostics, and an explicit user-resume path. JVM, lint, build, API 36 functional instrumentation, and the production-model fixture gate passed. Strict API 36 Recents-removal checks did not remove the task in either the future-alarm or active-playback case; earlier AVD task-removal PASS claims are withdrawn. The owner-reported iQOO Neo9 Pro failure could not be reproduced or cleared because the phone was not connected. Alpha.4 is therefore a local experimental candidate only; alpha.3 remains the last published prerelease.
+**Verdict: BLOCKED — PHYSICAL ACCEPTANCE UNAVAILABLE.** Round 4 implements Android-compliant service and state-reconciliation changes, bounded local lifecycle diagnostics, and an explicit user-resume path. JVM, lint, build, API 36 functional instrumentation, and the production-model fixture gate passed. Corrected local evidence confirmed future-alarm delivery after task removal and one active-alarm task removal with playback retained. Repeated active removals were inconsistent: the second local attempt and first CI attempt left the task present. The Recents-closure false negative has been corrected. The owner-reported iQOO Neo9 Pro behavior remains unverified because the phone was not connected. Alpha.4 remains a local experimental candidate only; alpha.3 is the last published prerelease.
 
 ## 2. Owner-reported physical defect
 
@@ -34,8 +34,9 @@ The only attached test target was the existing API 36 x86_64 `WakeGuard_API36` A
 
 - Playback resources are event-scoped and owned by `AlarmForegroundService`, not the Activity.
 - The prior manifest relied on the Android default for `stopWithTask`; omission alone did not establish the physical failure cause.
-- In strict TC01 and TC02 reruns, the Recents task remained after the attempted swipe. TC01 later delivered its alarm while the task was still present.
-- In TC02, playback, the same `RINGING` event and foreground service remained active while the task stayed present. This does not establish behavior after task removal; TC03 repeated removal was not run.
+- In the latest CI TC01 artifact (run 45577205967), task ID 36 and its card were absent after the future-alarm swipe. Android closed Recents after its last card was removed; the alarm subsequently delivered and playback started. The harness incorrectly labeled this partial because it required Recents to remain open.
+- In CI TC02, task ID 37 remained after the first active-playback swipe. Playback, the same `RINGING` event and foreground service remained active while the task stayed present.
+- In a corrected local TC02 rerun, the first active swipe removed task ID 225; event 11, its foreground service and MediaPlayer remained active. After reopening the app, a second swipe left task ID 226 present and the same event remained active. The run stopped there and emergency cleanup completed.
 - A separate idle-state smoke swipe removed a task from Recents, but this does not reproduce task removal with an alarm scheduled or active.
 - Ordinary sticky recovery and same-event state checks passed in the scheduled AVD flow before its live camera scene failed to qualify.
 - The default AVD camera scene did not qualify within the scheduled flow's 35-second window. The harness emergency-stopped the event; this is a scenario limitation, not a model-gate pass.
@@ -58,7 +59,7 @@ No OEM switch was changed or required by emulator acceptance. On the iQOO, first
 
 ## 10. Before/after device behavior
 
-There is no physical before/after comparison. In the strict AVD TC01 and TC02 checks, the task remained listed after the attempted swipe. TC01's alarm later delivered while that task remained; TC02's same `RINGING` event, service and MediaPlayer remained active while the task stayed present. Neither case demonstrates recovery after task removal and neither closes the reported iQOO defect.
+There is no physical before/after comparison. CI run 45577205967 verified that the future-alarm swipe removed task ID 36 and the one-time alarm later delivered with playback. The Recents surface closed after the last card was removed; this is why the old harness returned a false partial. In a corrected local TC02 run, the first active swipe removed task ID 225 while event 11, its service and MediaPlayer stayed active. A second local swipe after reopening left task ID 226 present; CI's active swipe also left task ID 37 present. No physical active-alarm result exists, so the reported iQOO defect remains open.
 
 ## 11. Automated regression
 
@@ -67,7 +68,7 @@ There is no physical before/after comparison. In the strict AVD TC01 and TC02 ch
 - Android lint: **0 errors, 32 warnings, 4 hints**.
 - Debug and instrumentation APK builds: passed.
 - Production model gate: **4/6** labeled positives, **1/2** independent positives, **0/5** obvious unrelated scenes accepted; the existing gate and policy remained unchanged.
-- Dedicated task-removal harness: **PARTIAL / NOT PASSED**. Strict task-ID checks showed the task remained after the attempted swipe in TC01 and TC02. TC01 later delivered while the task remained; TC02 playback and the same event continued while the task remained. Both events were emergency-stopped with `verified_count=0`; TC03 was not run. Earlier PASS claims based on Recents label disappearance are withdrawn.
+- Dedicated task-removal harness: **PARTIAL**. Manual CI artifact review confirmed TC01 task ID 36 and card disappeared, and its one-time alarm later delivered and played; the old harness wrongly required Recents to remain open and returned PARTIAL. In the corrected local run, TC01 passed and the first active TC02 swipe removed task ID 225 while the same event, foreground service and MediaPlayer remained active. The next local attempt left task ID 226 present; CI run 45577205967 also left task ID 37 present on active swipe 1. Both local events were emergency-stopped with `verified_count=0`; three repeated removals were not completed. Physical behavior remains untested.
 - Scheduled full CameraX flow with task removal and ordinary process recovery: **PARTIAL**. Earlier lifecycle steps passed, but the AVD's selected live scene did not qualify within 35 seconds; emergency cleanup passed.
 - A Round 4 camera-screen-off rerun did not observe `Asleep` after its AVD key events. Round 3 has separate prior AVD screen-off evidence; neither result establishes physical screen-off behavior.
 
@@ -83,7 +84,7 @@ The app retains the explicit confirmation-gated emergency stop. Local AVD and in
 
 ## 14. GitHub CI
 
-Run [45574688456](https://github.com/miku-wwl/WakeGuard/actions/runs/45574688456) tested strict-harness commit `03393692ecafe3f35c37c5d15113028dafab53ef`. `verify` passed; API 36 functional instrumentation passed; the strict emulator task-removal regression failed because the first active swipe left task ID 36 present. The same event remained `RINGING`, with its foreground service and MediaPlayer active. TC01's one-time alarm also delivered while its task remained present. The unchanged lightweight production-model gate passed; `real-vision-gate` failed closed because the emulator job failed. Artifact upload passed. CI does not include or substitute for physical iQOO acceptance. Full evidence and artifact path are in `D:\workshop\nov\reports\round4\09_CI_ACCEPTANCE.md`.
+Run [45577205967](https://github.com/miku-wwl/WakeGuard/actions/runs/45577205967) tested final documentation-head SHA `f925bd3c9365abe60fc322eca250cd0020d79c36` (source then unchanged from `0339369`). `verify`, API 36 functional instrumentation and the lightweight model gate passed. Artifact review confirmed TC01 task ID 36 and its card disappeared; the one-time alarm later delivered and played. The old harness returned a false partial because Recents closed after its last card was removed. CI TC02 active swipe left task ID 37 present while the same event, foreground service and MediaPlayer remained active, so the emulator job and fail-closed `real-vision-gate` failed. The corrected local run removed active task ID 225 once with the same event and playback preserved, then failed to remove reopened task ID 226 on attempt 2. Both local events were emergency-stopped with `verified_count=0`; evidence uploaded. The Recents-closure fix is in the current working tree and awaits CI. Physical iQOO remains separate and untested. Full CI evidence is in `D:\workshop\nov\reports\round4\ci-45577205967`.
 
 ## 15. Acceptance matrix
 
@@ -99,7 +100,7 @@ Physical acceptance and OriginOS settings remain unavailable. `START_STICKY` is 
 
 ## 18. Final commit and release status
 
-Product implementation commit: `8d5d92d101d0a9c8ed35c579d90a1b28473b0080`. Strict harness and evidence correction commit: `03393692ecafe3f35c37c5d15113028dafab53ef`. The final CI report and acceptance matrix are included in this repository revision. Alpha.4 is not published. Alpha.3 remains the historical emulator-validated prerelease. No release tag or GitHub release for alpha.4 will be created until physical acceptance reaches `PASS_NATIVE` or `PASS_WITH_OEM_CONFIGURATION` and all other mandatory gates pass.
+Product implementation commit: `8d5d92d101d0a9c8ed35c579d90a1b28473b0080`. Strict harness and evidence correction commit: `03393692ecafe3f35c37c5d15113028dafab53ef`. The final CI report and matrix are included in the repository revision. Alpha.4 is not published. Alpha.3 remains the historical emulator-validated prerelease. No release tag or GitHub release for alpha.4 will be created until physical acceptance reaches `PASS_NATIVE` or `PASS_WITH_OEM_CONFIGURATION` and all other mandatory gates pass.
 
 ## 19. Final verdict
 
