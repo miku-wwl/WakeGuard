@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
-      model_gate: ${{ steps.real_model.outcome }}
+      model_gate: ${{ steps.lightweight_model.outcome }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
@@ -117,24 +117,38 @@ jobs:
           if [[ "${{ steps.functional.outcome }}" != 'success' ]]; then
             adb exec-out screencap -p > ci-evidence/functional-post-run.png || true
           fi
-      - name: Assert complete and incomplete fixtures with production models
+      - name: Enforce lightweight policy with production models
         if: always() && steps.boot.outcome == 'success'
-        id: real_model
+        id: lightweight_model
         continue-on-error: true
         run: |
           ./gradlew connectedDebugAndroidTest --no-daemon \
             -Pandroid.testInstrumentationRunnerArguments.class=com.mikuwwl.wakeguard.RealVisionAcceptanceTest
-      - name: Save real inference evidence
+      - name: Save lightweight model evidence and historical diagnostic
         if: always() && steps.boot.outcome == 'success'
         run: |
           if [[ -d app/build/outputs/androidTest-results/connected/debug ]]; then
-            cp -r app/build/outputs/androidTest-results/connected/debug ci-evidence/real-model
+            cp -r app/build/outputs/androidTest-results/connected/debug ci-evidence/lightweight-model
           fi
-          adb logcat -d -s WakeGuardFixture:I WakeGuardAlarm:I WakeGuardRestore:I AndroidRuntime:E > ci-evidence/model-and-alarm-logcat.txt
-          if [[ "${{ steps.real_model.outcome }}" != 'success' ]]; then
-            adb exec-out screencap -p > ci-evidence/model-post-run.png || true
+          adb logcat -d -s WakeGuardPolicy:I WakeGuardVision:I WakeGuardAlarm:I WakeGuardRestore:I AndroidRuntime:E > ci-evidence/model-and-alarm-logcat.txt
+          python3 tools/round3/collect_policy_logcat.py ci-evidence/model-and-alarm-logcat.txt ci-evidence/vision-policy-results.json --allow-missing
+          if [[ "${{ steps.lightweight_model.outcome }}" != 'success' ]]; then
+            adb exec-out screencap -p > ci-evidence/lightweight-model-post-run.png || true
           fi
-          python3 tools/round2/collect_fixture_scores.py ci-evidence ci-evidence/model-evaluation.json
+      - name: Record historical strict gate as diagnostic only
+        if: always() && steps.boot.outcome == 'success'
+        id: historical_strict
+        continue-on-error: true
+        run: |
+          ./gradlew connectedDebugAndroidTest --no-daemon \
+            -Pandroid.testInstrumentationRunnerArguments.class=com.mikuwwl.wakeguard.HistoricalStrictVisionDiagnosticTest
+      - name: Save historical strict diagnostic evidence
+        if: always() && steps.boot.outcome == 'success'
+        run: |
+          if [[ -d app/build/outputs/androidTest-results/connected/debug ]]; then
+            cp -r app/build/outputs/androidTest-results/connected/debug ci-evidence/historical-strict-diagnostic
+          fi
+          adb logcat -d -s WakeGuardFixture:I AndroidRuntime:E > ci-evidence/historical-strict-logcat.txt
       - name: Upload emulator evidence
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
@@ -160,4 +174,4 @@ jobs:
             echo '::error::The functional and production-model gates must pass. Read the emulator evidence before release.'
             exit 1
           fi
-          echo 'Historical fixture gate passed. Independent holdout and live-camera signoff are still required.'
+          echo 'Product-aligned lightweight vision gate passed. The historical strict benchmark is diagnostic only; local real CameraX end-to-end acceptance remains separately required.'

@@ -14,6 +14,7 @@ import android.os.SystemClock
 import android.util.Rational
 import android.view.Surface
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -72,15 +73,15 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.mikuwwl.wakeguard.R
 import com.mikuwwl.wakeguard.domain.VerificationAttempt
 import com.mikuwwl.wakeguard.domain.VisionFrame
-import com.mikuwwl.wakeguard.domain.VisionThresholds
+import com.mikuwwl.wakeguard.domain.VerificationPolicy
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 @Composable
 fun CameraVerificationScreen(
-    thresholds: VisionThresholds,
+    eventId: Long,
+    policy: VerificationPolicy,
     onVerified: () -> Unit,
-    onRecordFailedAttempt: () -> Unit,
     onEmergencyStop: () -> Unit,
     onBackToAlarm: () -> Unit,
     engineFactory: (Context) -> VisionEngine = { OnDeviceVisionEngine(it) },
@@ -92,11 +93,11 @@ fun CameraVerificationScreen(
     val power = remember(context) { context.getSystemService(PowerManager::class.java) }
     val lifecycleOwner = LocalLifecycleOwner.current
     val currentOnVerified by rememberUpdatedState(onVerified)
-    val attempt = remember(thresholds) { VerificationAttempt(thresholds) }
-    var frame by remember { mutableStateOf<VisionFrame?>(null) }
+    val attempt = remember(eventId, policy) { VerificationAttempt(policy) }
     var failure by remember { mutableStateOf<String?>(null) }
-    var consecutive by remember { mutableStateOf(0) }
-    var failedAttemptsShown by remember { mutableStateOf(0) }
+    var sinkDetected by remember { mutableStateOf(false) }
+    var dentalDetected by remember { mutableStateOf(false) }
+    var freshFrames by remember { mutableStateOf(0) }
     var generation by remember(attempt) { mutableLongStateOf(attempt.generation) }
     var hasPermission by remember {
         mutableStateOf(cameraPermissionChecker(context))
@@ -107,9 +108,14 @@ fun CameraVerificationScreen(
     fun resetAttempt() {
         attempt.invalidate()
         generation = attempt.generation
-        frame = null
-        consecutive = 0
+        sinkDetected = false
+        dentalDetected = false
+        freshFrames = 0
         failure = null
+    }
+    BackHandler(enabled = true) {
+        resetAttempt()
+        onBackToAlarm()
     }
     DisposableEffect(lifecycleOwner, attempt) {
         val observer = LifecycleEventObserver { _, event ->
@@ -212,8 +218,9 @@ fun CameraVerificationScreen(
                         ) {
                             val progress = attempt.accept(currentGeneration, timestamp, arrivalMs, SystemClock.elapsedRealtime(), scores)
                             if (progress != null) {
-                                frame = scores
-                                consecutive = progress.consecutiveValidFrames
+                                sinkDetected = progress.sinkDetected
+                                dentalDetected = progress.dentalDetected
+                                freshFrames = progress.freshFrames
                                 failure = null
                                 if (progress.passed) currentOnVerified()
                             }
@@ -222,8 +229,9 @@ fun CameraVerificationScreen(
                     onFailure = { message ->
                         if (currentGeneration == attempt.generation) {
                             attempt.failure(currentGeneration)
-                            frame = null
-                            consecutive = 0
+                            sinkDetected = false
+                            dentalDetected = false
+                            freshFrames = 0
                             failure = message
                         }
                     },
@@ -238,24 +246,20 @@ fun CameraVerificationScreen(
                 shape = RoundedCornerShape(20.dp),
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("请让洗手池、牙刷和牙膏同时出现在画面中", color = Color.White, style = MaterialTheme.typography.titleMedium)
-                    VisionRow("洗手池", frame?.sink, thresholds.sink, "vision_sink")
-                    VisionRow("牙刷", frame?.toothbrush, thresholds.toothbrush, "vision_toothbrush")
-                    VisionRow("牙膏", frame?.toothpaste, thresholds.toothpaste, "vision_toothpaste")
-                    Text("已连续通过 $consecutive / 3 帧。", color = Color(0xFFB7C9C8), style = MaterialTheme.typography.bodySmall)
+                    Text("请前往洗手池附近", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                    VerificationStatus("洗手池", sinkDetected, "vision_sink_status")
+                    VerificationStatus("牙刷或牙膏", dentalDetected, "vision_dental_status")
                     Text(
-                        failure ?: "在光线充足处靠近洗手台，保持三个物品都在画面内。",
+                        if (sinkDetected && dentalDetected) "正在确认连续实时画面（$freshFrames 帧）…" else "将洗手池或洗漱用品对准摄像头。",
+                        color = Color(0xFFB7C9C8),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Text(
+                        failure ?: "只使用本次闹钟中的新鲜相机画面；返回或切到后台后需要重新识别。",
                         color = if (failure == null) Color(0xFFB7C9C8) else Color(0xFFFFB4AB),
                         minLines = 2,
                         style = MaterialTheme.typography.bodySmall,
                     )
-                    OutlinedButton(
-                        onClick = { resetAttempt(); failedAttemptsShown += 1; onRecordFailedAttempt() },
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                    ) {
-                        Text("记录本次未通过并重新扫描")
-                    }
-                    if (failedAttemptsShown > 0) Text("已记录未通过 $failedAttemptsShown 次", color = Color(0xFFB7C9C8), style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -268,12 +272,11 @@ fun CameraVerificationScreen(
 }
 
 @Composable
-private fun VisionRow(label: String, score: Float?, threshold: Float, testTag: String) {
-    val found = score != null && score >= threshold
-    Row(Modifier.fillMaxWidth().testTag(if (score == null) "${testTag}_waiting" else "${testTag}_score"), verticalAlignment = Alignment.CenterVertically) {
+private fun VerificationStatus(label: String, found: Boolean, testTag: String) {
+    Row(Modifier.fillMaxWidth().testTag(testTag), verticalAlignment = Alignment.CenterVertically) {
         Text(if (found) "✓" else "○", color = if (found) Color(0xFF8FE1B1) else Color(0xFFFFD08A))
         Text("  $label", color = Color.White, modifier = Modifier.weight(1f))
-        Text(score?.let { "%.0f%% / %.0f%%".format(it * 100, threshold * 100) } ?: "等待画面", color = Color(0xFFB7C9C8))
+        Text(if (found) "已检测到" else "等待画面", color = Color(0xFFB7C9C8))
     }
 }
 
@@ -360,6 +363,11 @@ private class WakeGuardFrameAnalyzer(
             val detector = engine ?: engineFactory(appContext).also { engine = it }
             bitmap = image.toUprightBitmap()
             val result = detector.analyze(bitmap)
+            val elapsedMs = (SystemClock.elapsedRealtime() - now).coerceAtLeast(0L)
+            android.util.Log.i(
+                "WakeGuardVision",
+                "event camera frame=$timestamp latencyMs=$elapsedMs sink=${result.sink} toothbrush=${result.toothbrush} toothpaste=${result.toothpaste}",
+            )
             mainHandler.post { if (accepting.get()) onFrame(timestamp, now, result) }
         } catch (_: Exception) {
             initializationFailed = engine == null

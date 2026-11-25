@@ -1,26 +1,41 @@
-# AI model and verification
+# Offline vision model and verification
+
+## Purpose and product change
+
+WakeGuard is a personal anti-snooze alarm with lightweight offline camera verification. The product owner clarified for Round 3 that the camera is behavioral friction to encourage approaching a wash area. It is not biometric or identity verification and does not need research-grade precision. This authorized requirement replaces Round 2's strict three-object and 30-positive/30-negative release criteria. Round 2 datasets and failed results remain intact for comparison.
 
 ## Bundled pipeline
 
-WakeGuard uses Google's EfficientDet-Lite0 float32 model with MediaPipe Tasks for COCO sink and toothbrush detections. The detector scores an aspect-preserving full frame and overlapping square tiles. Higher pixel density in each tile helps some small objects and the full view retains room context. The app loads the detector into a shared read-only direct buffer to keep simultaneous graph creation independent of writable model caches.
+The app uses EfficientDet-Lite0 through MediaPipe Tasks for COCO sink and toothbrush detections, plus a local MobileNetV3-Small ONNX classifier for two MIMEX toothpaste product labels. The detector scores the aspect-preserving frame and overlapping crops. The product classifier has no toothpaste localization box and can confuse visually similar objects. Inference runs on-device without a network service. See [third-party notices](../THIRD_PARTY_NOTICES.md).
 
-The MobileNetV3-Small ONNX model sums scores for MIMEX classes 20 and 21, the Sensodyne and Colgate toothpaste labels. It scores five centered views using the Python calibration crop geometry and RGB CHW normalization. Android uses platform bilinear resampling and Python uses PIL. They agree on the controlled RGB and geometry tests. High-frequency resampling differences can change natural-image scores. This classifier estimates a product class and returns no toothpaste box.
+Model outputs are scores, not calibrated probabilities. The app does not expose tuning sliders or store threshold preferences. The production evaluator is replaceable and unit-tested:
 
-The default confidence thresholds are 0.45 for the sink, 0.45 for the toothbrush and 0.93 for toothpaste. The evaluator requires all three for three consecutive fresh camera frames. Model assets and their provenance appear in [Third-party notices](../THIRD_PARTY_NOTICES.md).
+- **A — relaxed simultaneous:** sink ≥0.25, toothbrush ≥0.25, toothpaste ≥0.40 in two consecutive fresh frames.
+- **B — sink anchored:** sink ≥0.25 plus toothbrush ≥0.25 or toothpaste ≥0.40 in two consecutive fresh frames.
+- **C — session accumulated (selected):** collect sink ≥0.25 and either toothbrush ≥0.25 or toothpaste ≥0.40 across at least two fresh relevant frames within 12 seconds in the same active camera attempt.
 
-## What Round 2 measured
+Policy C was selected from measured acceptance and the live CameraX trial. It tolerates objects appearing in different frames while still requiring actual CameraX input and bundled model inference. Sessions do not cross alarms. Back, backgrounding, screen-off, permission loss, camera close, invalid model output and stale or duplicated frames reset evidence. Emergency stop is never counted as verification.
 
-The original Android fixture run rejected all four historical positives. The corrected input path recovers sink or toothbrush scores on some fixtures. For example, the Miriam Alonso scene 7622566 changed from `(0.000, 0.304, 0.434)` to about `(0.489, 0.393, 0.427)` in sink, brush, toothpaste order. It remains below the acceptance rule.
+## Round 3 measurements
 
-The comparison also ran a CPU SSDlite transfer experiment with a four-output head, including background, and the Apache-2.0 OmDet-Turbo open-vocabulary model. Thresholds were locked using calibration data before the frozen holdout was scored. The holdout has two independently grouped positives and 33 negatives. SSDlite and OmDet each accepted zero positives. OmDet accepted one incomplete scene. Its localized predictions also sometimes confused a toothbrush with a tube. Neither candidate is included in the app.
+The Android API 36 x86_64 emulator ran the bundled production models on six labeled washing-area images and five visually reviewed, obviously unrelated images. Each image was actually inferred on Android; the policy experiment fed two fresh evaluator frames for the same score vector.
 
-The small independent scene set does not establish alpha performance. The four historical positives are from two photo shoots and are tracked separately. Product-image metrics from the first round remain useful for checking the 28-class model, with a reported toothpaste precision of 87.16% and recall of 82.02% on 4,920 product images. The domain of use is different.
+| Policy | Complete labeled washing-area fixtures accepted | Independent positives accepted | Obviously unrelated scenes accepted |
+|---|---:|---:|---:|
+| A — relaxed simultaneous | 2/6 | 1/2 | 0/5 |
+| B — sink anchored | 4/6 | 1/2 | 0/5 |
+| C — session accumulated | 4/6 | 1/2 | 0/5 |
 
-## Reproduce
+The selected policy accepted three of the four historical Pexels fixtures and the independent Wikimedia scene `wm-64176029`. It rejected historical fixture `pexels-toothbrush-toothpaste-sink-8091047` and independent scene `wm-119921527` in still-image evaluation. The latter did pass during actual CameraX image-file AVD runs with live scores sink 0.539, toothbrush 0.264, toothpaste 0.213; the brush threshold allowed it. This illustrates why screenshot and actual camera pipeline evidence are reported separately.
 
-- `tools/model_training/prepare_mimex.py` and `train_classifier.py` reproduce the Round 1 classifier with the pinned MIMEX dataset revision and a training holdout for threshold selection.
-- `tools/round2/ssdlite-transfer.py` uses the pinned official TorchVision checkpoint with a frozen backbone and box regressor, and a three-class detection head trained on labeled local photos.
-- `tools/round2/evaluate-omdet.py` loads a pinned safetensors checkpoint offline. It uses fixed text prompts and records box and confidence outputs.
-- `tools/round2/android_dataset.py` and `score_scenes.py` reproduce the Android and grouped holdout measurements. The manifest, raw scores, artifact hashes and commands are under `D:\workshop\nov\reports\round2`.
+On the Round 2 Android holdout's 33 incomplete scenes, the selected thresholds accepted 3: `wm-66390412`, `wm-62169110`, and `wm-24333608`. These are bathroom/basin or dental-item confusers rather than obviously unrelated scenes, but they remain observed false accepts against the Round 2 incomplete-scene labels. All five new obvious unrelated scenes were rejected. The small labeled sample and intentional acceptance of approximate scenes do not establish general accuracy.
 
-Raw photos and exploratory checkpoints remain in the D-drive workspace. The app saves no camera images and uses no inference service.
+The fixture gate's model call latency was 377–578 ms per image on this AVD. During live CameraX runs, one cold run reported 6.8 seconds for the initial model frame followed by 1.2–1.4 seconds; later warm-model verification completed in 5.9 seconds from opening camera to terminal result. Another run took 18.0 seconds end-to-end. Emulator timing is not a physical-device performance claim.
+
+The machine-readable scores and source fixture provenance are in [`acceptance/ROUND3_VISION_METRICS.json`](acceptance/ROUND3_VISION_METRICS.json) and [`round3/ATTRIBUTION.md`](../app/src/androidTest/assets/vision/round3/ATTRIBUTION.md).
+
+## Historical measurements
+
+Round 2's original strict model gate accepted 0/4 historical positives and 0/2 independent positives, and the separate 33-incomplete-scene set accepted 0/33. Round 3 preserves that result as a non-blocking historical diagnostic; the new production-model gate enforces the owner's revised requirements instead of silently disabling vision checks.
+
+Raw Round 2 datasets and exploratory desktop models remain in the local `D:\workshop\nov\reports\round2` workspace and are not duplicated in this repository. Round 3's seven additional test-only images carry per-image licenses, source links and hashes in the checked-in attribution file.

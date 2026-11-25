@@ -73,4 +73,54 @@ class VerificationEvaluatorTest {
         assertEquals(1, frames.accept(0, 104, 3_600, 3_601, accurate)?.consecutiveValidFrames)
         assertEquals(1, frames.accept(0, 105, 8_000, 8_001, accurate)?.consecutiveValidFrames)
     }
+
+    @Test fun policyARequiresAllThreeObjectsAndPolicyBAllowsEitherDentalObject() {
+        val sinkAndBrush = VisionFrame(0.8f, 0.5f, 0.1f)
+        val simultaneous = VerificationPolicy.relaxedSimultaneous.newEvaluator()
+        assertFalse(simultaneous.accept(sinkAndBrush, 100).passed)
+        assertFalse(simultaneous.accept(sinkAndBrush, 800).passed)
+
+        val sinkAnchored = VerificationPolicy.sinkAnchored.newEvaluator()
+        assertFalse(sinkAnchored.accept(sinkAndBrush, 100).passed)
+        assertTrue(sinkAnchored.accept(sinkAndBrush, 800).passed)
+    }
+
+    @Test fun policyCAccumulatesSinkAndDentalEvidenceAcrossFreshFrames() {
+        val evaluator = VerificationPolicy.sessionAccumulated.newEvaluator()
+        val sinkOnly = VisionFrame(0.8f, 0f, 0f)
+        val dentalOnly = VisionFrame(0f, 0.5f, 0f)
+
+        val first = evaluator.accept(sinkOnly, 1_000)
+        assertTrue(first.sinkDetected)
+        assertFalse(first.dentalDetected)
+        assertFalse(first.passed)
+
+        val second = evaluator.accept(dentalOnly, 1_700)
+        assertTrue(second.sinkDetected)
+        assertTrue(second.dentalDetected)
+        assertEquals(2, second.freshFrames)
+        assertTrue(second.passed)
+    }
+
+    @Test fun policyCEvidenceExpiresAndInvalidInferenceClearsTheSession() {
+        val evaluator = VerificationPolicy.sessionAccumulated.newEvaluator()
+        evaluator.accept(VisionFrame(0.8f, 0f, 0f), 100)
+        val expired = evaluator.accept(VisionFrame(0f, 0.5f, 0f), 12_101)
+        assertFalse(expired.passed)
+        assertEquals(1, expired.freshFrames)
+
+        val invalidated = evaluator.accept(VisionFrame(Float.NaN, 1f, 1f), 12_200)
+        assertFalse(invalidated.sinkDetected)
+        assertFalse(invalidated.dentalDetected)
+        assertEquals(0, invalidated.freshFrames)
+        assertFalse(evaluator.accept(VisionFrame(0f, 0.5f, 0f), 12_900).passed)
+    }
+
+    @Test fun sessionAccumulationCanOnlyCompleteWithTwoFreshFrames() {
+        val evaluator = VerificationPolicy.sessionAccumulated.newEvaluator()
+        val both = VisionFrame(0.8f, 0.5f, 0.6f)
+        assertFalse(evaluator.accept(both, 1_000).passed)
+        assertTrue(evaluator.accept(both, 1_700).passed)
+        assertTrue(evaluator.accept(both, 2_400).passed)
+    }
 }

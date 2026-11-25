@@ -1,0 +1,369 @@
+{
+  "schema_version": 1,
+  "product": "personal anti-snooze alarm with lightweight offline camera verification",
+  "acceptance_revision": {
+    "round2_high_precision_gate": "explicitly canceled by owner for Round 3; historical results retained",
+    "round3_goal": "sink-area plus dental-care evidence as behavioral friction, not authentication"
+  },
+  "baseline": {
+    "round2_commit": "2486dc75deb83e79aef203b62915fb9d597783ba",
+    "historical_strict_positive_accepted": 0,
+    "historical_strict_positive_total": 4,
+    "independent_positive_accepted": 0,
+    "independent_positive_total": 2,
+    "incomplete_scene_accepted": 0,
+    "incomplete_scene_total": 33,
+    "integrated_camerax_verified": false
+  },
+  "policy_comparison": {
+    "A": {
+      "name": "relaxed-simultaneous",
+      "positive_accepted": 2,
+      "positive_total": 6,
+      "independent_positive_accepted": 1,
+      "independent_positive_total": 2,
+      "obvious_unrelated_accepted": 0,
+      "obvious_unrelated_total": 5
+    },
+    "B": {
+      "name": "sink-anchored",
+      "positive_accepted": 4,
+      "positive_total": 6,
+      "independent_positive_accepted": 1,
+      "independent_positive_total": 2,
+      "obvious_unrelated_accepted": 0,
+      "obvious_unrelated_total": 5
+    },
+    "C": {
+      "name": "session-accumulated",
+      "positive_accepted": 4,
+      "positive_total": 6,
+      "independent_positive_accepted": 1,
+      "independent_positive_total": 2,
+      "obvious_unrelated_accepted": 0,
+      "obvious_unrelated_total": 5
+    }
+  },
+  "selected_policy": {
+    "name": "session-accumulated",
+    "strategy": "sink and toothbrush or toothpaste evidence across at least two fresh relevant frames in one camera session",
+    "thresholds": {
+      "sink": 0.25,
+      "toothbrush": 0.25,
+      "toothpaste": 0.4
+    },
+    "minimum_fresh_relevant_frames": 2,
+    "window_ms": 12000,
+    "gate_passed": true
+  },
+  "round3_fixture_gate": {
+    "selected_policy": "session-accumulated",
+    "thresholds": {
+      "sink": 0.25,
+      "toothbrush": 0.25,
+      "toothpaste": 0.4000000059604645
+    },
+    "required_fresh_frames": 2,
+    "evidence_window_ms": 12000,
+    "positive_accepted": 4,
+    "positive_total": 6,
+    "accepted_positive_ids": [
+      "pexels-toothbrush-toothpaste-at-sink",
+      "pexels-sink-toothpaste-8091115",
+      "pexels-toothpaste-sink-7622547",
+      "wm-64176029"
+    ],
+    "independent_positive_accepted": 1,
+    "independent_positive_total": 2,
+    "accepted_independent_ids": [
+      "wm-64176029"
+    ],
+    "obvious_unrelated_accepted": 0,
+    "obvious_unrelated_total": 5,
+    "accepted_unrelated_ids": [],
+    "fixtures": [
+      {
+        "id": "pexels-toothbrush-toothpaste-at-sink",
+        "group": "positive",
+        "independent_positive": false,
+        "scores": {
+          "sink": 0.48927041888237,
+          "toothbrush": 0.3928927481174469,
+          "toothpaste": 0.42740726470947266
+        },
+        "latency_ms": 578.0502,
+        "policy_acceptance": {
+          "relaxed-simultaneous": true,
+          "sink-anchored": true,
+          "session-accumulated": true
+        }
+      },
+      {
+        "id": "pexels-sink-toothpaste-8091115",
+        "group": "positive",
+        "independent_positive": false,
+        "scores": {
+          "sink": 0.6067704558372498,
+          "toothbrush": 0.39547112584114075,
+          "toothpaste": 0.00013021529593970627
+        },
+        "latency_ms": 409.0075,
+        "policy_acceptance": {
+          "relaxed-simultaneous": false,
+          "sink-anchored": true,
+          "session-accumulated": true
+        }
+      },
+      {
+        "id": "pexels-toothbrush-toothpaste-sink-8091047",
+        "group": "positive",
+        "independent_positive": false,
+        "scores": {
+          "sink": 0,
+          "toothbrush": 0.41827523708343506,
+          "toothpaste": 0.051168132573366165
+        },
+        "latency_ms": 392.0183,
+        "policy_acceptance": {
+          "relaxed-simultaneous": false,
+          "sink-anchored": false,
+          "session-accumulated": false
+        }
+      },
+      {
+        "id": "pexels-toothpaste-sink-7622547",
+        "group": "positive",
+        "independent_positive": false,
+        "scores": {
+          "sink": 0.6836882829666138,
+          "toothbrush": 0,
+          "toothpaste": 0.8112308382987976
+        },
+        "latency_ms": 397.5758,
+        "policy_acceptance": {
+          "relaxed-simultaneous": false,
+          "sink-anchored": true,
+          "session-accumulated": true
+        }
+      },
+      {
+        "id": "wm-64176029",
+        "group": "positive",
+        "independent_positive": true,
+        "scores": {
+          "sink": 0.6875892281532288,
+          "toothbrush": 0.5702874660491943,
+          "toothpaste": 0.6228155493736267
+        },
+        "latency_ms": 393.8589,
+        "policy_acceptance": {
+          "relaxed-simultaneous": true,
+          "sink-anchored": true,
+          "session-accumulated": true
+        }
+      },
+      {
+        "id": "wm-119921527",
+        "group": "positive",
+        "independent_positive": true,
+        "scores": {
+          "sink": 0.4968392252922058,
+          "toothbrush": 0,
+          "toothpaste": 0.1987536996603012
+        },
+        "latency_ms": 382.8467,
+        "policy_acceptance": {
+          "relaxed-simultaneous": false,
+          "sink-anchored": false,
+          "session-accumulated": false
+        }
+      },
+      {
+        "id": "wm-193088243-pharmacy",
+        "group": "obvious_unrelated",
+        "independent_positive": false,
+        "scores": {
+          "sink": 0,
+          "toothbrush": 0,
+          "toothpaste": 1.412275274503827e-08
+        },
+        "latency_ms": 386.1333,
+        "policy_acceptance": {
+          "relaxed-simultaneous": false,
+          "sink-anchored": false,
+          "session-accumulated": false
+        }
+      },
+      {
+        "id": "wm-117409408-wood-sticks",
+        "group": "obvious_unrelated",
+        "independent_positive": false,
+        "scores": {
+          "sink": 0,
+          "toothbrush": 0,
+          "toothpaste": 5.441410166895366e-08
+        },
+        "latency_ms": 388.5646,
+        "policy_acceptance": {
+          "relaxed-simultaneous": false,
+          "sink-anchored": false,
+          "session-accumulated": false
+        }
+      },
+      {
+        "id": "wm-28250893-pliers",
+        "group": "obvious_unrelated",
+        "independent_positive": false,
+        "scores": {
+          "sink": 0,
+          "toothbrush": 0,
+          "toothpaste": 0.4878140389919281
+        },
+        "latency_ms": 391.8526,
+        "policy_acceptance": {
+          "relaxed-simultaneous": false,
+          "sink-anchored": false,
+          "session-accumulated": false
+        }
+      },
+      {
+        "id": "wm-39393966-foam",
+        "group": "obvious_unrelated",
+        "independent_positive": false,
+        "scores": {
+          "sink": 0,
+          "toothbrush": 0,
+          "toothpaste": 0.3366917371749878
+        },
+        "latency_ms": 377.0039,
+        "policy_acceptance": {
+          "relaxed-simultaneous": false,
+          "sink-anchored": false,
+          "session-accumulated": false
+        }
+      },
+      {
+        "id": "wm-57000467-toy-animals",
+        "group": "obvious_unrelated",
+        "independent_positive": false,
+        "scores": {
+          "sink": 0,
+          "toothbrush": 0,
+          "toothpaste": 0.3878425359725952
+        },
+        "latency_ms": 385.7964,
+        "policy_acceptance": {
+          "relaxed-simultaneous": false,
+          "sink-anchored": false,
+          "session-accumulated": false
+        }
+      }
+    ]
+  },
+  "round2_manifest_holdout_under_fixed_round3_policy": {
+    "complete_positive_accepted": 1,
+    "complete_positive_total": 2,
+    "incomplete_scene_accepted": 3,
+    "incomplete_scene_total": 33,
+    "accepted_incomplete_scenes": [
+      {
+        "id": "wm-66390412",
+        "complete_positive": false,
+        "accepted_by_policy_c": true,
+        "scores": {
+          "sink": 0.8175180554389954,
+          "toothbrush": 0,
+          "toothpaste": 0.9696058034896851
+        }
+      },
+      {
+        "id": "wm-62169110",
+        "complete_positive": false,
+        "accepted_by_policy_c": true,
+        "scores": {
+          "sink": 0.25289538502693176,
+          "toothbrush": 0,
+          "toothpaste": 0.9442151188850403
+        }
+      },
+      {
+        "id": "wm-24333608",
+        "complete_positive": false,
+        "accepted_by_policy_c": true,
+        "scores": {
+          "sink": 0.3429177403450012,
+          "toothbrush": 0.5267924666404724,
+          "toothpaste": 0.6159181594848633
+        }
+      }
+    ],
+    "note": "33 incomplete labels are the original grouped holdout negatives; output is measured on reproduced Android model scores."
+  },
+  "live_camerax_successful_scheduled_runs": [
+    {
+      "event_id": 3,
+      "alarm_id": 3,
+      "room_outcome": "VERIFIED",
+      "verified_count_before": 0,
+      "verified_count_after": 1,
+      "camera_to_result_seconds": 18.04,
+      "screen_asleep_before_trigger": true,
+      "foreground_service_removed": true,
+      "notification_removed": true,
+      "wake_locks_released": true,
+      "playback_release_logged": true
+    },
+    {
+      "event_id": 4,
+      "alarm_id": 4,
+      "room_outcome": "VERIFIED",
+      "verified_count_after": 2,
+      "camera_to_terminal_seconds": 3.832,
+      "note": "actual live model frames in run-01 logcat; acceptance harness stopped on transient camera-page assertion after same event reached VERIFIED"
+    },
+    {
+      "event_id": 5,
+      "alarm_id": 5,
+      "room_outcome": "VERIFIED",
+      "verified_count_before": 2,
+      "verified_count_after": 3,
+      "camera_to_result_seconds": 5.87,
+      "screen_asleep_before_trigger": true,
+      "foreground_service_removed": true,
+      "notification_removed": true,
+      "wake_locks_released": true,
+      "playback_release_logged": true
+    }
+  ],
+  "live_unrelated_scheduled_run": {
+    "event_id": 2,
+    "outcome": "EMERGENCY_STOP",
+    "unrelated_scene_qualified": false,
+    "verified_statistics_unchanged": true,
+    "sample_model_frames": [
+      "WakeGuardVision: event camera frame=417332781800 latencyMs=1919 sink=0.0 toothbrush=0.0 toothpaste=1.987469E-6\r",
+      "WakeGuardVision: event camera frame=419268686096 latencyMs=1107 sink=0.0 toothbrush=0.0 toothpaste=1.987469E-6\r",
+      "WakeGuardVision: event camera frame=420373552126 latencyMs=1413 sink=0.0 toothbrush=0.0 toothpaste=1.987469E-6\r"
+    ],
+    "service_removed": true,
+    "notification_removed": true,
+    "wake_locks_released": true,
+    "playback_release_logged": true
+  },
+  "performance": {
+    "fixture_model_call_latency_ms_min": 377.0039,
+    "fixture_model_call_latency_ms_max": 578.0502,
+    "live_model_frame_latency_ms_sample_count": 10,
+    "live_model_frame_latency_ms_min": 604,
+    "live_model_frame_latency_ms_median": 1239.0,
+    "live_model_frame_latency_ms_max": 6807,
+    "scope": "Android API 36 x86_64 emulator only; not an ARM64 or physical-device claim"
+  },
+  "limitations": [
+    "4/6 positive gate and 1/2 independent positive acceptance are small labeled samples",
+    "3/33 historical incomplete scenes are accepted under the revised policy",
+    "the five obvious unrelated scenes are not representative of all bedrooms, ceilings, or blank images",
+    "imagefile camera end-to-end proves emulator CameraX production inference, not real-user liveness",
+    "physical-device preview, ARM64 runtime, camera framing and OEM power behavior are untested"
+  ]
+}

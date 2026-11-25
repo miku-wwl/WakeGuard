@@ -1,49 +1,48 @@
 # Architecture
 
-WakeGuard runs in a single Android application process. Room stores configured alarms and their wake events.
+WakeGuard runs as one Android application process. Room is the durable owner of alarm definitions and wake events. Android `AlarmManager` owns exact delivery after WakeGuard registers an enabled occurrence.
 
 ```mermaid
 flowchart TD
-    UI[Compose alarm editor] --> Coordinator[Alarm coordinator]
-    Coordinator --> Room[(Room alarms and wake events)]
-    Coordinator --> OS[AlarmManager exact alarm clock]
-    OS --> Trigger[Alarm delivery receiver]
+    UI[Compose alarm UI] --> Coordinator[Alarm coordinator]
+    Coordinator --> Room[(Room alarms and events)]
+    Coordinator --> OS[AlarmManager exact alarm]
+    OS --> Trigger[Token-matched receiver]
     Trigger --> Coordinator
-    Coordinator --> Service[Media playback foreground service]
-    Room --> Service
-    Room --> Active[Active alarm UI]
+    Room --> Service[Foreground playback service]
     Service --> Resources[Notification, player, vibration, wake lock]
+    Room --> Active[Active event screen]
     Active --> Camera[CameraX preview and analysis]
-    Camera --> Engine[Local VisionEngine]
-    Engine --> Evaluator[Three valid consecutive frames]
-    Evaluator --> Coordinator
+    Camera --> Engine[Local EfficientDet and ONNX models]
+    Engine --> Policy[Session-scoped VerificationPolicy]
+    Policy --> Coordinator
 ```
 
 ## Alarm ownership
 
-Each registration carries a due epoch and a unique token. Room records the token after Android accepts registration. Editing, disabling or deleting an alarm invalidates the old token. The receiver checks the stored token and atomically consumes a matching due occurrence. A repeat registers the next occurrence even when another event owns playback. The first event continues and the overlapping occurrence is recorded as missed.
+Each registration has a due epoch and unique token. Editing, disabling, or deleting an alarm invalidates its previous registration. Delivery checks the stored token and due occurrence, then consumes that registration transactionally before creating a wake event. A repeat schedules its next due occurrence even when another event owns playback; overlapping deliveries are recorded as missed without displacing the active event.
 
-The service observes the active Room event and owns one player, vibration request and wake lock. A prepared callback checks the current event and player under the same lock as terminal writes. A null sticky restart looks up the active event. A service with no active event releases its resources and stops. Each playback event keeps its own ringtone and vibration options. The configured ringtone is tried before the system alarm tone and the bundled backup tone.
+The foreground service owns one event, audio player, vibration request, notification, and wake lock. Playback callbacks recheck event and player ownership before they act. A sticky restart reads the active Room event and resumes that same event. Terminal state releases its playback resources and removes its ongoing notification. Emergency stop remains an explicitly confirmed, unverified terminal result.
 
 ```mermaid
 stateDiagram-v2
     [*] --> SCHEDULED
-    SCHEDULED --> RINGING: matching delivery
-    SCHEDULED --> MISSED: overlap or expired one-time alarm
-    RINGING --> VERIFYING: open camera
-    VERIFYING --> VERIFIED: three valid frames
+    SCHEDULED --> RINGING: matching one-use registration
+    SCHEDULED --> MISSED: expired or overlapping occurrence
+    RINGING --> VERIFYING: open live camera
+    VERIFYING --> VERIFIED: fresh sink plus dental evidence
     RINGING --> EMERGENCY_STOP: confirm emergency stop
     VERIFYING --> EMERGENCY_STOP: confirm emergency stop
-    RINGING --> INTERRUPTED: boot or lost service
-    VERIFYING --> INTERRUPTED: boot or lost service
-    RINGING --> FAILED: playback could not start
-    VERIFYING --> FAILED: playback could not recover
+    RINGING --> INTERRUPTED: system stops playback
+    VERIFYING --> INTERRUPTED: system stops playback
+    RINGING --> FAILED: playback cannot start
+    VERIFYING --> FAILED: playback cannot recover
 ```
 
-Schema v2 adds registration and event playback fields. Room preserves existing alarms, history and active playback settings. The active event takes precedence over the app's normal tabs and editor. Terminal events clear lock-screen and screen-on flags.
+Room schema v2 stores registrations, playback settings and event outcomes. While an event is active, its screen replaces ordinary tabs and the alarm editor. Back during ringing is consumed; Back during camera verification returns to ringing without completing or stopping the event. Home and task removal do not own the playback service.
 
-## Vision and privacy
+## Camera and privacy
 
-CameraX shares a view port between preview and analysis. Frames honor RGBA strides, crop and rotation. A worker owns model use and cleanup. Pausing the activity or display invalidates the attempt. Duplicate timestamps, stale frames, invalid scores and errors cannot advance the sequence. Threshold preferences are captured on entry to the camera screen.
+CameraX binds one shared view port to preview and image analysis. The analyzer honors RGBA row and pixel strides, crop and rotation, and closes every `ImageProxy`. Inference uses bundled offline models. Frames, scores and accumulated evidence remain in memory; camera images are not written to Room or uploaded.
 
-The on-device engine sends the letterboxed frame and overlapping crops to EfficientDet-Lite0 and uses the training-time crop geometry for the toothpaste classifier. The UI shows per-object scores. A product class score has no toothpaste box to display. Camera frames are processed in memory.
+`VerificationPolicy` is immutable for an alarm camera attempt. The production policy is session-accumulated sink plus either toothbrush or toothpaste evidence, with thresholds 0.25, 0.25 and 0.40 respectively. It needs two fresh relevant frames within 12 seconds. Returning from the camera, pausing the app, screen-off, permission loss, stale/duplicate frames, inference errors, and camera closure invalidate the attempt. A new alarm event gets a new evaluator. See [AI model and verification](AI_MODEL.md).

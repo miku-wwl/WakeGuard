@@ -1,6 +1,7 @@
 package com.mikuwwl.wakeguard
 
 import android.Manifest
+import android.view.KeyEvent
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -88,12 +89,41 @@ class AlarmFlowInstrumentedTest {
             }
             composeRule.onNodeWithTag("start_verification").performClick()
             composeRule.waitUntil(30_000) {
-                listOf("vision_sink_score", "vision_toothbrush_score", "vision_toothpaste_score").all { tag ->
+                listOf("vision_sink_status", "vision_dental_status").all { tag ->
                     composeRule.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
                 }
             }
             composeRule.onNodeWithTag("camera_preview").assertIsDisplayed()
         }
+    }
+
+    @Test fun backReturnsFromCameraButCannotDismissTheActiveAlarm() = runBlocking {
+        val appContext = ApplicationProvider.getApplicationContext<android.content.Context>()
+        InstrumentationRegistry.getInstrumentation().uiAutomation
+            .grantRuntimePermission(appContext.packageName, Manifest.permission.CAMERA)
+        val eventId = database.wakeEventDao().insert(
+            WakeEventEntity(alarmId = 104, triggeredAt = System.currentTimeMillis(), outcome = WakeOutcome.RINGING),
+        )
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("开始现场验证").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("start_verification").performClick()
+        composeRule.waitUntil(30_000) {
+            composeRule.onAllNodesWithTag("camera_preview").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("开始现场验证").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("紧急停止（记录为未完成）").assertIsDisplayed()
+        assertEquals(WakeOutcome.VERIFYING, database.wakeEventDao().getById(eventId)?.outcome)
+
+        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("开始现场验证").assertIsDisplayed()
+        assertEquals(WakeOutcome.VERIFYING, database.wakeEventDao().getById(eventId)?.outcome)
+        assertEquals(eventId, database.wakeEventDao().getActive()?.id)
     }
 
     @Test fun verificationAndEmergencyOutcomesAreIdempotent() = runBlocking {

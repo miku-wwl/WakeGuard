@@ -1,0 +1,11 @@
+# Round 3 known limitations
+
+- Policy C accepted 4/6 labeled complete washing-area fixtures, including 1/2 independent positives. It missed two scenes. The fixture set is small and cannot establish general accuracy.
+- Policy C accepted three of the 33 incomplete-scene Round 2 holdout images: `wm-66390412`, `wm-62169110`, and `wm-24333608`. It rejected all five additional, visually reviewed obvious unrelated scenes. Other bedrooms, blank frames, beds and ceilings are not represented by this five-image negative gate.
+- Toothpaste is a product-family classifier for two MIMEX labels, not a detection box. Unfamiliar tubes, occlusion, glare, unusual scale and lighting may fail or score a confuser.
+- Model calls took 377–578 ms on labeled fixtures. Live first-frame inference ranged up to 6.8 seconds; subsequent AVD frames measured 0.6–2.7 seconds. Three scheduled CameraX runs completed; two measured camera-screen-to-result durations were 5.87 and 18.04 seconds. AVD numbers are not physical-device performance claims.
+- CameraX consumed actual frames from the Android Emulator `imagefile:` virtual back camera. This proves the production CameraX/model path on the AVD, not user presence or real-world camera liveness. Screenshots showed a black AVD preview beneath the ongoing-notification display; physical preview and framing are untested.
+- Only API 36 x86_64 emulator runtime was exercised. The ARM64-v8a APK builds and verifies with the debug certificate; ARM64 runtime and physical phones were not tested.
+- The APK is debug signed. Exact alarm permission, notification permission, full-screen intent access, Android Doze/force-stop/shutdown, user volume and OEM battery policy remain OS/user controlled.
+- Round 2 reported differing `INTERRUPTED`/`MISSED` observations after a host-side abrupt AVD termination. Round 3 traced the separate source transitions and verified an orderly Android reboot, but did not reproduce the same-event conflict or test abrupt host power loss. Its old separately copied DB/WAL/SHM snapshots were not atomic.
+- The fixture scores are model outputs, not calibrated real-world probabilities. The camera task is behavioral friction and is not identity or security verification.

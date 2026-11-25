@@ -1,8 +1,9 @@
 # Android platform limits
 
-- Exact alarm access is required on Android 12 and higher. An enabled alarm with no confirmed registration is shown as unscheduled. Android can cancel exact alarms when access is revoked.
-- Notification permission and full-screen intent access are separate. The foreground service still owns the session when Android limits the notification or full-screen UI.
-- Android may recreate a sticky service after ordinary process death. It recovers only a persisted active event. A user force-stop, shutdown or system volume change remains authoritative. Reopening the app with an abandoned event and no service records a system interruption.
-- Boot reschedules repeats and records expired one-time alarms as missed. Clock and timezone changes recompute wall times. A time in a daylight-saving gap moves forward by the gap. A repeated wall time uses its earlier instant once that date.
-- Emulator audio and vibration state establish Android service behavior. Physical audibility, haptics, camera focus and OEM power behavior require separate evidence.
-- The supported image-file camera supplies frames through CameraX on the AVD. Static fixture input can exercise that path without proving user presence or real-world liveness.
+- Exact alarm access is required on Android 12 and later. Android can cancel schedules if access is revoked; WakeGuard reports the alarm as unscheduled until registration is accepted.
+- Notification permission, exact alarm access and full-screen intent access are separate user/system controls. Android may limit lock-screen presentation while the foreground service continues.
+- A sticky foreground service recovered the same Room event after ordinary app-process death on the API 36 AVD. Android can still stop services under platform policy. User force-stop, shutdown, permission revocation and system controls remain authoritative.
+- An orderly Android reboot was tested on the API 36 AVD: the same future due time was re-registered with a new token. A host-side abrupt AVD termination previously produced a different MISSED/INTERRUPTED observation; recent-write durability through abrupt emulator power loss remains unresolved.
+- Emulator screen-off, audio routing, vibration and image-file camera behavior are not proof of physical-device audibility, haptics, camera framing or OEM battery policy. No physical Android hardware was tested.
+- Round 3's virtual image-file camera supplied fresh frames through production CameraX analysis and produced a real `VERIFIED` Room event. Captured emulator preview screenshots were black beneath the notification shade; physical preview rendering and CameraX framing still need on-device validation.
+- Android's system Back/Home, recents, permissions, Doze, and force-stop behaviors cannot be completely overridden by an ordinary alarm app. Emergency stop is available to the user at all times.

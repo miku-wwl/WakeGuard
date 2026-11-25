@@ -54,7 +54,6 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -86,7 +85,7 @@ import com.mikuwwl.wakeguard.data.AlarmEntity
 import com.mikuwwl.wakeguard.data.WakeEventEntity
 import com.mikuwwl.wakeguard.data.WakeGuardRepository
 import com.mikuwwl.wakeguard.data.WakeOutcome
-import com.mikuwwl.wakeguard.domain.VisionThresholds
+import com.mikuwwl.wakeguard.domain.VerificationPolicy
 import com.mikuwwl.wakeguard.vision.CameraVerificationScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -159,9 +158,10 @@ private fun WakeGuardRoot(
         eventId == cameraEventId -> Route.VERIFY
         else -> Route.RINGING
     }
+    val activePolicy = remember(eventId) { VerificationPolicy.production }
     val exactPermission = remember(refreshToken) { repository.canScheduleExactAlarms() }
 
-    BackHandler(enabled = eventId != null) { /* Back never completes an alarm. */ }
+    BackHandler(enabled = eventId != null && screen == Route.RINGING) { /* Back never completes an alarm. */ }
 
     WakeGuardTheme {
         when (screen) {
@@ -179,19 +179,18 @@ private fun WakeGuardRoot(
                 onEmergencyStop = { emergencyEventId = eventId },
             )
             Route.VERIFY -> if (eventId != null) androidx.compose.runtime.key(eventId) {
-                val thresholds = remember { repository.thresholds() }
                 CameraVerificationScreen(
-                    thresholds = thresholds,
+                    eventId = eventId,
+                    policy = activePolicy,
                     onVerified = {
                         scope.launch {
                             if (repository.finishVerified(eventId)) {
                                 resultWasSuccess = true
-                                resultLabel = "洗手池、牙刷和牙膏均已识别"
+                                resultLabel = "已通过本次现场洗漱场景识别"
                                 route = Route.RESULT
                             }
                         }
                     },
-                    onRecordFailedAttempt = { scope.launch { repository.recordFailedAttempt(eventId) } },
                     onEmergencyStop = { emergencyEventId = eventId },
                     onBackToAlarm = { cameraEventId = null },
                 )
@@ -459,8 +458,8 @@ private fun AlarmRingingScreen(onStartVerification: () -> Unit, onEmergencyStop:
             Box(Modifier.size(92.dp).clip(CircleShape).background(Color(0xFFB5E8D0)), contentAlignment = Alignment.Center) {
                 Icon(painterResource(R.drawable.ic_wakeguard), contentDescription = null, tint = Color(0xFF123E34), modifier = Modifier.size(48.dp))
             }
-            Text("起床时间到了", color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
-            Text("走到洗手台，让身体开始新的一天。", color = Color(0xFFC2D3D0), style = MaterialTheme.typography.bodyLarge)
+            Text("正在响铃，请起床。", color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+            Text("请前往洗手池附近。", color = Color(0xFFC2D3D0), style = MaterialTheme.typography.bodyLarge)
             Button(onClick = onStartVerification, modifier = Modifier.fillMaxWidth().height(56.dp).testTag("start_verification")) { Text("开始现场验证") }
             OutlinedButton(
                 onClick = onEmergencyStop,
@@ -552,7 +551,6 @@ private fun SettingsScreen(
     val context = LocalContext.current
     val alarmManager = remember(context) { context.getSystemService(AlarmManager::class.java) }
     val notifications = remember(context) { context.getSystemService(NotificationManager::class.java) }
-    var thresholds by remember { mutableStateOf(repository.thresholds()) }
     var showLicenses by remember { mutableStateOf(false) }
     val modelStatus = remember {
         runCatching { context.assets.open("efficientdet_lite0.tflite").close(); context.assets.open("toothpaste_classifier.onnx").close() }.isSuccess
@@ -560,7 +558,7 @@ private fun SettingsScreen(
     LazyColumn(modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(20.dp, 24.dp, 20.dp, 32.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
             Text("设置与权限", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Text("检查 Android 授权和本地识别门槛", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("检查 Android 授权和本地识别状态", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         item {
             PermissionCard("精确闹钟", if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()) "已允许" else "未允许") {
@@ -593,10 +591,16 @@ private fun SettingsScreen(
                 }
             }
         }
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("现场验证规则", style = MaterialTheme.typography.titleMedium)
+                    Text("本次闹钟规则固定：在 12 秒内的实时画面中识别洗手池和牙刷或牙膏，并确认至少两帧。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("返回、切到后台或关闭相机后会清除本次识别进度。", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
         item { TextButton(onClick = { showLicenses = true }) { Text("查看第三方模型许可") } }
-        item { ThresholdSlider("洗手池置信度", thresholds.sink, { value -> thresholds = thresholds.copy(sink = value); repository.saveThresholds(thresholds.copy(sink = value)) }) }
-        item { ThresholdSlider("牙刷置信度", thresholds.toothbrush, { value -> thresholds = thresholds.copy(toothbrush = value); repository.saveThresholds(thresholds.copy(toothbrush = value)) }) }
-        item { ThresholdSlider("牙膏置信度", thresholds.toothpaste, { value -> thresholds = thresholds.copy(toothpaste = value); repository.saveThresholds(thresholds.copy(toothpaste = value)) }, 0.5f..0.99f) }
         item { Text("Android 可能限制后台启动、全屏通知、精确闹钟和省电策略。系统强制停止或关机无法由普通应用阻止。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
     if (showLicenses) {
@@ -616,19 +620,6 @@ private fun PermissionCard(title: String, status: String, onClick: () -> Unit) {
         Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) { Text(title, style = MaterialTheme.typography.titleMedium); Text(status, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             Text("管理", color = MaterialTheme.colorScheme.primary)
-        }
-    }
-}
-
-@Composable
-private fun ThresholdSlider(label: String, value: Float, onChange: (Float) -> Unit, range: ClosedFloatingPointRange<Float> = 0.2f..0.95f) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-        Column(Modifier.padding(horizontal = 18.dp, vertical = 12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(label, modifier = Modifier.weight(1f))
-                Text("${(value * 100).toInt()}%", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-            }
-            Slider(value = value, onValueChange = onChange, valueRange = range)
         }
     }
 }

@@ -15,6 +15,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.mikuwwl.wakeguard.domain.VerificationEvaluator
+import com.mikuwwl.wakeguard.domain.VerificationPolicy
 import com.mikuwwl.wakeguard.domain.VisionFrame
 import com.mikuwwl.wakeguard.domain.VisionThresholds
 import com.mikuwwl.wakeguard.vision.CameraVerificationScreen
@@ -103,7 +104,7 @@ class VisionEngineInstrumentedTest {
         }
     }
 
-    @Test fun threeIdenticalValidCameraFramesCompleteVerification() {
+    @Test fun twoFreshLiveCameraFramesCompleteVerification() {
         val appContext = ApplicationProvider.getApplicationContext<Context>()
         InstrumentationRegistry.getInstrumentation().uiAutomation
             .grantRuntimePermission(appContext.packageName, Manifest.permission.CAMERA)
@@ -112,9 +113,9 @@ class VisionEngineInstrumentedTest {
         composeRule.setContent {
             MaterialTheme {
                 CameraVerificationScreen(
-                    thresholds = VisionThresholds(sink = 0.5f, toothbrush = 0.5f, toothpaste = 0.5f),
+                    eventId = 1L,
+                    policy = VerificationPolicy.production,
                     onVerified = { verified.set(true) },
-                    onRecordFailedAttempt = {},
                     onEmergencyStop = {},
                     onBackToAlarm = {},
                     engineFactory = { ConstantVisionEngine(analyzedFrames) },
@@ -122,7 +123,7 @@ class VisionEngineInstrumentedTest {
             }
         }
         composeRule.waitUntil(30_000) { verified.get() }
-        assertTrue("The same passing scene must be accepted over three analyzed frames", analyzedFrames.get() >= 3)
+        assertTrue("Two distinct live frames must be analyzed before completion", analyzedFrames.get() >= 2)
     }
 
     @Test fun cameraPermissionDenialKeepsEmergencyExitAvailable() {
@@ -130,9 +131,9 @@ class VisionEngineInstrumentedTest {
         composeRule.setContent {
             MaterialTheme {
                 CameraVerificationScreen(
-                    thresholds = VisionThresholds(),
+                    eventId = 2L,
+                    policy = VerificationPolicy.production,
                     onVerified = {},
-                    onRecordFailedAttempt = {},
                     onEmergencyStop = { emergencyRequested.set(true) },
                     onBackToAlarm = {},
                     cameraPermissionChecker = { false },
@@ -151,7 +152,7 @@ class VisionEngineInstrumentedTest {
         composeRule.setContent {
             MaterialTheme {
                 CameraVerificationScreen(
-                    VisionThresholds(), { verified.set(true) }, {}, { emergency.set(true) }, {},
+                    3L, VerificationPolicy.production, { verified.set(true) }, { emergency.set(true) }, {},
                     engineFactory = { throw IllegalStateException("Injected initialization failure") },
                 )
             }
@@ -172,12 +173,13 @@ class VisionEngineInstrumentedTest {
         composeRule.setContent {
             MaterialTheme {
                 CameraVerificationScreen(
-                    VisionThresholds(), { verified.set(true) }, {}, {}, {},
+                    4L, VerificationPolicy.production, { verified.set(true) }, {}, {},
                     engineFactory = {
                         object : VisionEngine {
                             override fun analyze(bitmap: Bitmap): VisionFrame = when (frames.incrementAndGet()) {
-                                3 -> error("Injected inference error")
-                                in 1..5 -> VisionFrame(1f, 1f, 1f)
+                                1 -> VisionFrame(1f, 0f, 0f)
+                                2 -> error("Injected inference error")
+                                3, 4 -> VisionFrame(0f, 1f, 0f)
                                 else -> VisionFrame(0f, 0f, 0f)
                             }
                             override fun close() = Unit
@@ -202,7 +204,7 @@ class VisionEngineInstrumentedTest {
         composeRule.setContent {
             MaterialTheme {
                 if (display.value) CameraVerificationScreen(
-                    VisionThresholds(), { verified.set(true) }, {}, {}, { display.value = false },
+                    5L, VerificationPolicy.production, { verified.set(true) }, {}, { display.value = false },
                     engineFactory = {
                         object : VisionEngine {
                             override fun analyze(bitmap: Bitmap): VisionFrame {
